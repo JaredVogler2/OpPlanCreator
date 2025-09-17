@@ -1,0 +1,2379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manufacturing Production Scheduler</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .control-group {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 10px;
+        }
+
+        .control-group label {
+            display: inline-block;
+            width: 180px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .control-group input, .control-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 120px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        #undoBtn, #redoBtn {
+            background: #6b7280;
+            margin-left: 20px;
+        }
+        
+        #undoBtn:hover:not(:disabled), #redoBtn:hover:not(:disabled) {
+            background: #4b5563;
+        }
+        
+        #undoBtn:disabled, #redoBtn:disabled {
+            background: #e5e7eb;
+            color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .gantt-container {
+            margin: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 70vh;
+            position: relative;
+        }
+
+        .gantt-header {
+            display: flex;
+            position: sticky;
+            top: 0;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            z-index: 100;
+            min-height: 60px;
+            overflow: hidden;
+            width: fit-content;
+            min-width: 100%;
+        }
+
+        .gantt-header-product {
+            width: 150px;
+            min-width: 150px;
+            padding: 10px;
+            font-weight: bold;
+            background: #e9ecef;
+            border-right: 1px solid #dee2e6;
+            position: sticky;
+            left: 0;
+            z-index: 101;
+        }
+
+        .gantt-header-timeline {
+            display: flex;
+            overflow: visible;
+            position: relative;
+            flex: 1;
+            min-width: fit-content;
+        }
+
+        .gantt-day-header {
+            width: 30px;
+            min-width: 30px;
+            max-width: 30px;
+            padding: 5px 2px;
+            text-align: center;
+            border-right: 1px solid #e0e0e0;
+            cursor: pointer;
+            font-size: 11px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .gantt-day-header:hover {
+            background: #e3f2fd;
+        }
+
+        .gantt-day-header.weekend {
+            background: #f5f5f5;
+        }
+
+        .gantt-day-header.holiday {
+            background: #ffebee;
+        }
+
+        .gantt-day-header.vertical-day {
+            background: #fff3e0;
+            text-decoration: line-through;
+        }
+
+        .gantt-body {
+            position: relative;
+            overflow-x: visible;
+        }
+
+        .gantt-row {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            min-height: 40px;
+            position: relative;
+            width: fit-content;
+            min-width: 100%;
+        }
+
+        .gantt-row:hover {
+            background: #fafafa;
+        }
+
+        .gantt-product-label {
+            width: 150px;
+            min-width: 150px;
+            padding: 10px;
+            font-weight: 500;
+            background: white;
+            border-right: 1px solid #dee2e6;
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .gantt-timeline {
+            display: flex;
+            position: relative;
+            flex: 1;
+            flex-shrink: 0;
+        }
+
+        .gantt-day-cell {
+            width: 30px;
+            min-width: 30px;
+            max-width: 30px;
+            height: 40px;
+            border-right: 1px solid #f0f0f0;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .gantt-day-cell.weekend {
+            background: #fafafa;
+        }
+
+        .gantt-day-cell.holiday {
+            background: #fff5f5;
+        }
+
+        .gantt-day-cell.vertical-day {
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 5px,
+                rgba(255,193,7,0.1) 5px,
+                rgba(255,193,7,0.1) 10px
+            );
+        }
+
+        .gantt-bar {
+            position: absolute;
+            height: 30px;
+            top: 5px;
+            border-radius: 4px;
+            color: white;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            padding: 0 5px;
+            transition: transform 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 5;
+        }
+
+        .gantt-bar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 20;
+        }
+        
+        .gantt-bar.extended::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 5px,
+                rgba(0,0,0,0.03) 5px,
+                rgba(0,0,0,0.03) 10px
+            );
+            pointer-events: none;
+            border-radius: 4px;
+        }
+        
+        .gantt-bar-day {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 29px;
+            border-right: 1px solid rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .gantt-bar-day:hover {
+            background: rgba(255,255,255,0.2);
+            border-right: 1px solid rgba(0,0,0,0.2);
+        }
+        
+        .gantt-bar-day:last-child {
+            border-right: none;
+        }
+        
+        .gantt-bar-day[style*="cursor: default"]:hover {
+            background: transparent;
+            cursor: default;
+        }
+        
+        .gantt-bar-day.product-non-working {
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(255,255,255,0.1),
+                rgba(255,255,255,0.1) 3px,
+                rgba(0,0,0,0.2) 3px,
+                rgba(0,0,0,0.2) 6px
+            );
+            opacity: 0.6;
+        }
+        
+        .gantt-bar-day.product-non-working:hover {
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(255,255,255,0.2),
+                rgba(255,255,255,0.2) 3px,
+                rgba(0,0,0,0.3) 3px,
+                rgba(0,0,0,0.3) 6px
+            );
+        }
+        
+        .gantt-bar-day-number {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 8px;
+            color: rgba(255,255,255,0.4);
+            pointer-events: none;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        /* Position colors for Assembly Line A (darkest) */
+        .gantt-bar.line-A.pos-0 { background: #d32f2f; } /* Red */
+        .gantt-bar.line-A.pos-1 { background: #ff6f00; } /* Dark Orange */
+        .gantt-bar.line-A.pos-2 { background: #ffa000; } /* Orange */
+        .gantt-bar.line-A.pos-3 { background: #ffc107; } /* Amber */
+        .gantt-bar.line-A.pos-4 { background: #ffeb3b; color: #333; } /* Yellow */
+        .gantt-bar.line-A.pos-5 { background: #8bc34a; } /* Light Green */
+        .gantt-bar.line-A.pos-6 { background: #4caf50; } /* Green */
+        .gantt-bar.line-A.pos-7 { background: #00bcd4; } /* Cyan */
+        .gantt-bar.line-A.pos-8 { background: #2196f3; } /* Blue */
+        .gantt-bar.line-A.pos-9 { background: #3f51b5; } /* Indigo */
+        .gantt-bar.line-A.pos-FGI { background: #1976d2; } /* Deep Blue */
+        .gantt-bar.line-A.pos-Delivery { background: #7b1fa2; } /* Purple */
+
+        /* Position colors for Assembly Line B (lighter) */
+        .gantt-bar.line-B.pos-0 { background: #ef5350; } /* Red */
+        .gantt-bar.line-B.pos-1 { background: #ff8a65; } /* Dark Orange */
+        .gantt-bar.line-B.pos-2 { background: #ffb74d; } /* Orange */
+        .gantt-bar.line-B.pos-3 { background: #ffd54f; } /* Amber */
+        .gantt-bar.line-B.pos-4 { background: #fff176; color: #333; } /* Yellow */
+        .gantt-bar.line-B.pos-5 { background: #aed581; } /* Light Green */
+        .gantt-bar.line-B.pos-6 { background: #81c784; } /* Green */
+        .gantt-bar.line-B.pos-7 { background: #4dd0e1; } /* Cyan */
+        .gantt-bar.line-B.pos-8 { background: #64b5f6; } /* Blue */
+        .gantt-bar.line-B.pos-9 { background: #7986cb; } /* Indigo */
+        .gantt-bar.line-B.pos-FGI { background: #42a5f5; } /* Deep Blue */
+        .gantt-bar.line-B.pos-Delivery { background: #ab47bc; } /* Purple */
+
+        /* Position colors for Assembly Line C (even lighter) */
+        .gantt-bar.line-C.pos-0 { background: #ffcdd2; } /* Red */
+        .gantt-bar.line-C.pos-1 { background: #ffccbc; } /* Dark Orange */
+        .gantt-bar.line-C.pos-2 { background: #ffe0b2; } /* Orange */
+        .gantt-bar.line-C.pos-3 { background: #ffecb3; } /* Amber */
+        .gantt-bar.line-C.pos-4 { background: #fff9c4; color: #333; } /* Yellow */
+        .gantt-bar.line-C.pos-5 { background: #dcedc8; } /* Light Green */
+        .gantt-bar.line-C.pos-6 { background: #c8e6c9; } /* Green */
+        .gantt-bar.line-C.pos-7 { background: #b2ebf2; } /* Cyan */
+        .gantt-bar.line-C.pos-8 { background: #bbdefb; } /* Blue */
+        .gantt-bar.line-C.pos-9 { background: #c5cae9; } /* Indigo */
+        .gantt-bar.line-C.pos-FGI { background: #90caf9; } /* Deep Blue */
+        .gantt-bar.line-C.pos-Delivery { background: #ce93d8; } /* Purple */
+
+        /* Position colors for Assembly Line D (lightest) */
+        .gantt-bar.line-D.pos-0 { background: #ffebee; } /* Red */
+        .gantt-bar.line-D.pos-1 { background: #fff3e0; } /* Dark Orange */
+        .gantt-bar.line-D.pos-2 { background: #fff8e1; } /* Orange */
+        .gantt-bar.line-D.pos-3 { background: #fffde7; color: #333; } /* Amber */
+        .gantt-bar.line-D.pos-4 { background: #fffff8; color: #333; } /* Yellow */
+        .gantt-bar.line-D.pos-5 { background: #f1f8e9; } /* Light Green */
+        .gantt-bar.line-D.pos-6 { background: #e8f5e9; } /* Green */
+        .gantt-bar.line-D.pos-7 { background: #e0f7fa; } /* Cyan */
+        .gantt-bar.line-D.pos-8 { background: #e3f2fd; } /* Blue */
+        .gantt-bar.line-D.pos-9 { background: #e8eaf6; } /* Indigo */
+        .gantt-bar.line-D.pos-FGI { background: #bbdefb; } /* Deep Blue */
+        .gantt-bar.line-D.pos-Delivery { background: #e1bee7; } /* Purple */
+
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+            min-width: 200px;
+        }
+
+        .context-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+            position: relative;
+        }
+
+        .context-menu-item:hover {
+            background: #f0f0f0;
+        }
+
+        .submenu-parent {
+            position: relative;
+        }
+
+        .submenu {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            display: none;
+            min-width: 100px;
+            margin-left: 5px;
+        }
+
+        .submenu-parent:hover .submenu {
+            display: block;
+        }
+
+        .legend {
+            background: white;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .legend-item {
+            display: inline-block;
+            margin: 5px 15px 5px 0;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 3px;
+            vertical-align: middle;
+        }
+
+        .stats {
+            background: white;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .stat-item {
+            display: inline-block;
+            margin-right: 30px;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .stat-value {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal h3 {
+            margin-bottom: 15px;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 3000;
+        }
+
+        .toast.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .tooltip {
+            position: fixed;
+            background: linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(30,30,30,0.95) 100%);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 2000;
+            white-space: nowrap;
+            visibility: hidden;
+            opacity: 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: opacity 0.15s ease-in-out, visibility 0.15s;
+            min-width: 180px;
+        }
+
+        .tooltip.show {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .tooltip-row {
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tooltip-label {
+            font-weight: 600;
+            color: #9ca3af;
+            display: inline-block;
+            margin-right: 10px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tooltip-value {
+            color: white;
+            font-weight: 400;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Manufacturing Production Scheduler</h1>
+        <p>Interactive Gantt Chart with Manual Day Adjustments</p>
+        <p style="font-size: 12px; opacity: 0.8; margin-top: 5px;">
+            <strong>Right-click any day</strong> to toggle between working/non-working | 
+            Right-click header dates for global non-working days | 
+            Ctrl+Z to undo
+        </p>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Days per Position:</label>
+            <input type="number" id="daysPerPosition" value="5" min="1">
+        </div>
+        <div class="control-group">
+            <label>Days FGI to Delivery:</label>
+            <input type="number" id="daysFGItoDelivery" value="3" min="1">
+        </div>
+        <div class="control-group">
+            <label>Number of Lines:</label>
+            <select id="numLines">
+                <option value="2" selected>2 (A, B)</option>
+                <option value="3">3 (A, B, C)</option>
+                <option value="4">4 (A, B, C, D)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Number of Positions:</label>
+            <input type="number" id="numPositions" value="4" min="1" max="10">
+        </div>
+        <div class="control-group">
+            <label>Number of Products to Display:</label>
+            <input type="number" id="productsPerLine" value="10" min="1">
+        </div>
+        <div style="display: block; width: 100%; margin-top: 15px;">
+            <h4 style="margin-bottom: 10px; font-weight: 600; color: #333;">Assembly Line Start Dates:</h4>
+            <div class="control-group" id="lineAStart" style="display: inline-block;">
+                <label>Line A Start Date:</label>
+                <input type="date" id="startDateA" value="2025-09-17" title="Select start date for Line A">
+            </div>
+            <div class="control-group" id="lineBStart" style="display: inline-block;">
+                <label>Line B Start Date:</label>
+                <input type="date" id="startDateB" value="2025-09-19" title="Select start date for Line B">
+            </div>
+            <div class="control-group" id="lineCStart" style="display: inline-block;">
+                <label>Line C Start Date:</label>
+                <input type="date" id="startDateC" value="2025-09-23" title="Select start date for Line C">
+            </div>
+            <div class="control-group" id="lineDStart" style="display: inline-block;">
+                <label>Line D Start Date:</label>
+                <input type="date" id="startDateD" value="2025-09-25" title="Select start date for Line D">
+            </div>
+        </div>
+        <button onclick="generateSchedule()">Generate Schedule</button>
+        <button onclick="saveSchedule()">Save Schedule</button>
+        <button onclick="loadSchedule()">Load Schedule</button>
+        <button onclick="exportToExcel()">Export to Excel</button>
+        <button onclick="undoAction()" id="undoBtn" disabled>↶ Undo</button>
+        <button onclick="redoAction()" id="redoBtn" disabled>↷ Redo</button>
+    </div>
+
+    <div class="stats" id="stats">
+        <div class="stat-item">
+            <span class="stat-label">Total Products:</span>
+            <span class="stat-value" id="totalProducts">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Schedule Duration:</span>
+            <span class="stat-value" id="scheduleDuration">0 days</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Non-Working Days:</span>
+            <span class="stat-value" id="nonWorkingDays">0</span>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-title">Position Colors (Line A - Darkest):</div>
+        <div id="legendContent"></div>
+    </div>
+
+    <div class="gantt-container" id="ganttContainer">
+        <div class="gantt-header">
+            <div class="gantt-header-product">Product / Line</div>
+            <div class="gantt-header-timeline" id="ganttHeaderTimeline"></div>
+        </div>
+        <div class="gantt-body" id="ganttBody"></div>
+    </div>
+
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="addVerticalDay()">Add Vertical Day (All Lines)</div>
+        <div class="context-menu-item submenu-parent" onmouseover="showLineSubmenu(event)">
+            Add Non-Working Day (Line) ▶
+            <div class="submenu" id="lineSubmenu">
+                <div class="context-menu-item" onclick="addLineNonWorkingDay('A')">Line A</div>
+                <div class="context-menu-item" onclick="addLineNonWorkingDay('B')">Line B</div>
+                <div class="context-menu-item" onclick="addLineNonWorkingDay('C')">Line C</div>
+                <div class="context-menu-item" onclick="addLineNonWorkingDay('D')">Line D</div>
+            </div>
+        </div>
+        <div class="context-menu-item" onclick="removeNonWorkingDay()">Remove Non-Working Day</div>
+        <div class="context-menu-item" onclick="closeContextMenu()">Cancel</div>
+    </div>
+    
+    <div class="context-menu" id="dayContextMenu">
+        <div class="context-menu-item" id="toggleDayItem" onclick="toggleProductDay()">Make Non-Working Day</div>
+        <div class="context-menu-item" onclick="closeDayContextMenu()">Cancel</div>
+    </div>
+
+    <div id="saveModal" class="modal">
+        <div class="modal-content">
+            <h3>Save Schedule</h3>
+            <input type="text" id="saveName" placeholder="Enter schedule name">
+            <button onclick="confirmSave()">Save</button>
+            <button onclick="closeSaveModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div id="loadModal" class="modal">
+        <div class="modal-content">
+            <h3>Load Schedule</h3>
+            <select id="loadSelect" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+            <button onclick="confirmLoad()">Load</button>
+            <button onclick="closeLoadModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Global variables
+        let schedule = [];
+        let holidays = [
+            // Boeing Holiday Calendar
+            // 2025 Holidays (12 days)
+            '2025-01-01', '2025-05-26', '2025-07-04', '2025-09-01', '2025-11-27',
+            '2025-11-28', '2025-12-24', '2025-12-25', '2025-12-26', '2025-12-29',
+            '2025-12-30', '2025-12-31',
+            // 2026 Holidays (12 days)
+            '2026-01-01', '2026-05-25', '2026-07-03', '2026-09-07', '2026-11-26',
+            '2026-11-27', '2026-12-24', '2026-12-25', '2026-12-28', '2026-12-29',
+            '2026-12-30', '2026-12-31',
+            // 2027 Holidays (12 days)
+            '2027-01-01', '2027-05-31', '2027-07-05', '2027-09-06', '2027-11-25',
+            '2027-11-26', '2027-12-24', '2027-12-27', '2027-12-28', '2027-12-29',
+            '2027-12-30', '2027-12-31',
+            // 2028 Holidays (12 days)
+            '2028-01-03', '2028-05-29', '2028-07-04', '2028-09-04', '2028-11-23',
+            '2028-11-24', '2028-12-22', '2028-12-25', '2028-12-26', '2028-12-27',
+            '2028-12-28', '2028-12-29'
+        ];
+        let verticalDays = [];
+        let lineSpecificNonWorkingDays = {};
+        let horizontalDays = {}; // Product-specific delays
+        let startDate;
+        let endDate;
+        let currentContextDate = null;
+        
+        // Variables for day context menu
+        let currentDayContextProduct = null;
+        let currentDayContextDate = null;
+        let currentDayContextPosition = null;
+
+        // Undo/Redo system
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_UNDO_STACK = 50; // Limit undo stack size
+
+        // Save current state for undo
+        function saveStateForUndo(actionDescription) {
+            const state = {
+                description: actionDescription,
+                schedule: JSON.parse(JSON.stringify(schedule)), // Deep clone
+                verticalDays: [...verticalDays],
+                lineSpecificNonWorkingDays: JSON.parse(JSON.stringify(lineSpecificNonWorkingDays)),
+                horizontalDays: JSON.parse(JSON.stringify(horizontalDays)),
+                settings: {
+                    daysPerPosition: document.getElementById('daysPerPosition').value,
+                    daysFGItoDelivery: document.getElementById('daysFGItoDelivery').value,
+                    numLines: document.getElementById('numLines').value,
+                    numPositions: document.getElementById('numPositions').value,
+                    productsPerLine: document.getElementById('productsPerLine').value,
+                    startDateA: document.getElementById('startDateA').value,
+                    startDateB: document.getElementById('startDateB').value,
+                    startDateC: document.getElementById('startDateC').value,
+                    startDateD: document.getElementById('startDateD').value
+                },
+                timestamp: new Date().toISOString()
+            };
+            
+            // Add to undo stack
+            undoStack.push(state);
+            
+            // Limit stack size
+            if (undoStack.length > MAX_UNDO_STACK) {
+                undoStack.shift();
+            }
+            
+            // Clear redo stack when new action is performed
+            redoStack = [];
+            
+            // Update button states
+            updateUndoRedoButtons();
+        }
+
+        // Restore a saved state
+        function restoreState(state) {
+            // Restore schedule with proper date parsing
+            schedule = state.schedule.map(product => ({
+                ...product,
+                positions: Object.fromEntries(
+                    Object.entries(product.positions).map(([pos, data]) => {
+                        let startDate, endDate;
+                        
+                        if (typeof data.start === 'string') {
+                            const startMatch = data.start.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (startMatch) {
+                                startDate = new Date(parseInt(startMatch[1]), parseInt(startMatch[2]) - 1, parseInt(startMatch[3]));
+                            } else {
+                                startDate = new Date(data.start);
+                            }
+                        } else {
+                            startDate = new Date(data.start);
+                        }
+                        
+                        if (typeof data.end === 'string') {
+                            const endMatch = data.end.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (endMatch) {
+                                endDate = new Date(parseInt(endMatch[1]), parseInt(endMatch[2]) - 1, parseInt(endMatch[3]));
+                            } else {
+                                endDate = new Date(data.end);
+                            }
+                        } else {
+                            endDate = new Date(data.end);
+                        }
+                        
+                        return [
+                            pos,
+                            {
+                                ...data,
+                                start: startDate,
+                                end: endDate
+                            }
+                        ];
+                    })
+                )
+            }));
+            
+            // Restore other state
+            verticalDays = [...state.verticalDays];
+            lineSpecificNonWorkingDays = JSON.parse(JSON.stringify(state.lineSpecificNonWorkingDays));
+            horizontalDays = JSON.parse(JSON.stringify(state.horizontalDays));
+            
+            // Restore settings
+            document.getElementById('daysPerPosition').value = state.settings.daysPerPosition;
+            document.getElementById('daysFGItoDelivery').value = state.settings.daysFGItoDelivery;
+            document.getElementById('numLines').value = state.settings.numLines;
+            document.getElementById('numPositions').value = state.settings.numPositions;
+            document.getElementById('productsPerLine').value = state.settings.productsPerLine;
+            document.getElementById('startDateA').value = state.settings.startDateA;
+            document.getElementById('startDateB').value = state.settings.startDateB;
+            document.getElementById('startDateC').value = state.settings.startDateC;
+            document.getElementById('startDateD').value = state.settings.startDateD;
+            
+            // Update UI
+            updateLineStartDates();
+            renderGantt();
+            updateStats();
+        }
+
+        // Undo last action
+        function undoAction() {
+            if (undoStack.length === 0) return;
+            
+            // Save current state to redo stack
+            const currentState = {
+                description: "Before undo",
+                schedule: JSON.parse(JSON.stringify(schedule)),
+                verticalDays: [...verticalDays],
+                lineSpecificNonWorkingDays: JSON.parse(JSON.stringify(lineSpecificNonWorkingDays)),
+                horizontalDays: JSON.parse(JSON.stringify(horizontalDays)),
+                settings: {
+                    daysPerPosition: document.getElementById('daysPerPosition').value,
+                    daysFGItoDelivery: document.getElementById('daysFGItoDelivery').value,
+                    numLines: document.getElementById('numLines').value,
+                    numPositions: document.getElementById('numPositions').value,
+                    productsPerLine: document.getElementById('productsPerLine').value,
+                    startDateA: document.getElementById('startDateA').value,
+                    startDateB: document.getElementById('startDateB').value,
+                    startDateC: document.getElementById('startDateC').value,
+                    startDateD: document.getElementById('startDateD').value
+                },
+                timestamp: new Date().toISOString()
+            };
+            redoStack.push(currentState);
+            
+            // Pop and restore previous state
+            const previousState = undoStack.pop();
+            restoreState(previousState);
+            
+            updateUndoRedoButtons();
+            showToast(`Undone: ${previousState.description}`);
+        }
+
+        // Redo last undone action
+        function redoAction() {
+            if (redoStack.length === 0) return;
+            
+            // Save current state to undo stack
+            const currentState = {
+                description: "Before redo",
+                schedule: JSON.parse(JSON.stringify(schedule)),
+                verticalDays: [...verticalDays],
+                lineSpecificNonWorkingDays: JSON.parse(JSON.stringify(lineSpecificNonWorkingDays)),
+                horizontalDays: JSON.parse(JSON.stringify(horizontalDays)),
+                settings: {
+                    daysPerPosition: document.getElementById('daysPerPosition').value,
+                    daysFGItoDelivery: document.getElementById('daysFGItoDelivery').value,
+                    numLines: document.getElementById('numLines').value,
+                    numPositions: document.getElementById('numPositions').value,
+                    productsPerLine: document.getElementById('productsPerLine').value,
+                    startDateA: document.getElementById('startDateA').value,
+                    startDateB: document.getElementById('startDateB').value,
+                    startDateC: document.getElementById('startDateC').value,
+                    startDateD: document.getElementById('startDateD').value
+                },
+                timestamp: new Date().toISOString()
+            };
+            undoStack.push(currentState);
+            
+            // Pop and restore next state
+            const nextState = redoStack.pop();
+            restoreState(nextState);
+            
+            updateUndoRedoButtons();
+            showToast(`Redone action`);
+        }
+
+        // Update undo/redo button states
+        function updateUndoRedoButtons() {
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            
+            if (undoBtn) {
+                undoBtn.disabled = undoStack.length === 0;
+                if (undoStack.length > 0) {
+                    const lastAction = undoStack[undoStack.length - 1];
+                    undoBtn.title = `Undo: ${lastAction.description}`;
+                } else {
+                    undoBtn.title = 'Nothing to undo';
+                }
+            }
+            
+            if (redoBtn) {
+                redoBtn.disabled = redoStack.length === 0;
+                redoBtn.title = redoStack.length > 0 ? 'Redo last undone action' : 'Nothing to redo';
+            }
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            // Set up event listener for number of lines change
+            document.getElementById('numLines').addEventListener('change', function() {
+                updateLineStartDates();
+                // Regenerate schedule to apply new colors
+                generateSchedule();
+            });
+            updateLineStartDates();
+            generateSchedule();
+            
+            // Add keyboard shortcuts for undo/redo
+            document.addEventListener('keydown', function(e) {
+                // Ctrl+Z or Cmd+Z for undo
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    undoAction();
+                }
+                // Ctrl+Y or Ctrl+Shift+Z or Cmd+Shift+Z for redo
+                else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                    e.preventDefault();
+                    redoAction();
+                }
+            });
+        };
+
+        // Show/hide line start date inputs based on number of lines
+        function updateLineStartDates() {
+            const numLines = parseInt(document.getElementById('numLines').value);
+            
+            // Get the elements
+            const lineAStart = document.getElementById('lineAStart');
+            const lineBStart = document.getElementById('lineBStart');
+            const lineCStart = document.getElementById('lineCStart');
+            const lineDStart = document.getElementById('lineDStart');
+            
+            // Always show A and B
+            if (lineAStart) lineAStart.style.display = 'inline-block';
+            if (lineBStart) lineBStart.style.display = 'inline-block';
+            
+            // Show/hide C based on selection
+            if (lineCStart) {
+                lineCStart.style.display = numLines >= 3 ? 'inline-block' : 'none';
+            }
+            
+            // Show/hide D based on selection  
+            if (lineDStart) {
+                lineDStart.style.display = numLines >= 4 ? 'inline-block' : 'none';
+            }
+        }
+
+        // Check if a date is a weekend
+        function isWeekend(date) {
+            const day = date.getDay();
+            return day === 0 || day === 6;
+        }
+
+        // Check if a date is a holiday
+        function isHoliday(date) {
+            const dateStr = formatDate(date);
+            return holidays.includes(dateStr);
+        }
+
+        // Check if a date is a vertical non-working day
+        function isVerticalDay(date) {
+            const dateStr = formatDate(date);
+            return verticalDays.includes(dateStr);
+        }
+
+        // Check if a date is a non-working day for a specific line
+        function isLineNonWorkingDay(date, line) {
+            const dateStr = formatDate(date);
+            return lineSpecificNonWorkingDays[line] && lineSpecificNonWorkingDays[line].includes(dateStr);
+        }
+
+        // Check if a date is a horizontal day for a specific product
+        function isHorizontalDay(date, productId) {
+            const dateStr = formatDate(date);
+            return horizontalDays[productId] && horizontalDays[productId].includes(dateStr);
+        }
+
+        // Format date to YYYY-MM-DD using local timezone
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Add working days to a date
+        function addWorkingDays(startDate, days, line, productId) {
+            let date = new Date(startDate);
+            date.setHours(0, 0, 0, 0); // Ensure we're working with midnight
+            let workingDaysAdded = 0;
+            
+            while (workingDaysAdded < days) {
+                date.setDate(date.getDate() + 1);
+                if (!isWeekend(date) && !isHoliday(date) && !isVerticalDay(date) && 
+                    !isLineNonWorkingDay(date, line) && !isHorizontalDay(date, productId)) {
+                    workingDaysAdded++;
+                }
+            }
+            
+            return date;
+        }
+
+        // Calculate actual calendar days including non-working days
+        function calculateCalendarDays(startDate, endDate, line, productId) {
+            let days = 0;
+            let date = new Date(startDate);
+            
+            while (date <= endDate) {
+                days++;
+                date.setDate(date.getDate() + 1);
+            }
+            
+            return days;
+        }
+
+        // Generate the production schedule
+        function generateSchedule() {
+            const daysPerPosition = parseInt(document.getElementById('daysPerPosition').value);
+            const daysFGItoDelivery = parseInt(document.getElementById('daysFGItoDelivery').value);
+            const numLines = parseInt(document.getElementById('numLines').value);
+            const numPositions = parseInt(document.getElementById('numPositions').value);
+            const productsPerLine = parseInt(document.getElementById('productsPerLine').value);
+            
+            schedule = [];
+            const lines = ['A', 'B', 'C', 'D'].slice(0, numLines);
+            
+            // Find the earliest start date among active lines for chart rendering
+            let earliestDate = null;
+            
+            // Generate position names: 0, 1, 2, ..., numPositions-1, FGI, Delivery
+            const positions = [];
+            for (let i = 0; i < numPositions; i++) {
+                positions.push(i.toString());
+            }
+            positions.push('FGI', 'Delivery');
+            
+            // Update legend
+            updateLegend(positions);
+            
+            // Track current date for each line
+            const lineCurrentDates = {};
+            
+            // Initialize start dates for each line
+            lines.forEach(line => {
+                let currentDate;
+                if (line === 'A') {
+                    const dateStr = document.getElementById('startDateA').value;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    currentDate = new Date(year, month - 1, day); // month is 0-indexed
+                } else if (line === 'B') {
+                    const dateStr = document.getElementById('startDateB').value;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    currentDate = new Date(year, month - 1, day);
+                } else if (line === 'C') {
+                    const dateStr = document.getElementById('startDateC').value;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    currentDate = new Date(year, month - 1, day);
+                } else if (line === 'D') {
+                    const dateStr = document.getElementById('startDateD').value;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    currentDate = new Date(year, month - 1, day);
+                }
+                
+                currentDate.setHours(0, 0, 0, 0);
+                lineCurrentDates[line] = currentDate;
+                
+                // Track earliest date for chart rendering
+                if (!earliestDate || currentDate < earliestDate) {
+                    earliestDate = new Date(currentDate);
+                }
+            });
+            
+            // Generate products with sequential numbering, alternating between lines
+            let productId = 1000;
+            const totalProducts = productsPerLine * numLines;
+            
+            for (let round = 0; round < productsPerLine; round++) {
+                for (let lineIndex = 0; lineIndex < numLines; lineIndex++) {
+                    const line = lines[lineIndex];
+                    
+                    const product = {
+                        id: productId++,
+                        line: line,
+                        positions: {}
+                    };
+                    
+                    let positionStart = new Date(lineCurrentDates[line]);
+                    positionStart.setHours(0, 0, 0, 0);
+                    
+                    positions.forEach((pos, posIndex) => {
+                        const daysInPosition = (pos === 'Delivery') ? daysFGItoDelivery : daysPerPosition;
+                        const positionEnd = addWorkingDays(positionStart, daysInPosition - 1, line, product.id);
+                        
+                        product.positions[pos] = {
+                            start: new Date(positionStart),
+                            end: new Date(positionEnd),
+                            days: daysInPosition
+                        };
+                        
+                        positionStart = addWorkingDays(positionEnd, 1, line, product.id);
+                    });
+                    
+                    schedule.push(product);
+                    
+                    // Update line's current date for next product
+                    lineCurrentDates[line] = addWorkingDays(product.positions['0'].end, 1, line, product.id);
+                }
+            }
+            
+            // Sort schedule by product ID to maintain proper order in display
+            schedule.sort((a, b) => a.id - b.id);
+            
+            // Set global startDate for chart rendering
+            startDate = earliestDate || new Date();
+            
+            renderGantt();
+            updateStats();
+        }
+
+        // Generate dynamic colors based on number of positions
+        function generatePositionColors(numPositions) {
+            const colors = {};
+            
+            // Calculate total items (positions + FGI + Delivery)
+            const totalItems = numPositions + 2;
+            
+            // Define the rainbow spectrum for smooth transitions
+            const rainbowColors = [
+                { r: 244, g: 67, b: 54 },   // Red
+                { r: 255, g: 152, b: 0 },   // Orange  
+                { r: 255, g: 235, b: 59 },  // Yellow
+                { r: 139, g: 195, b: 74 },  // Green
+                { r: 33, g: 150, b: 243 },   // Blue
+                { r: 103, g: 58, b: 183 }   // Purple
+            ];
+            
+            // Generate colors for each position
+            for (let i = 0; i < numPositions; i++) {
+                const progress = i / (totalItems - 1);
+                const segmentLength = 1 / (rainbowColors.length - 1);
+                const segmentIndex = Math.floor(progress / segmentLength);
+                const segmentProgress = (progress % segmentLength) / segmentLength;
+                
+                const startColor = rainbowColors[Math.min(segmentIndex, rainbowColors.length - 1)];
+                const endColor = rainbowColors[Math.min(segmentIndex + 1, rainbowColors.length - 1)];
+                
+                const r = Math.round(startColor.r + (endColor.r - startColor.r) * segmentProgress);
+                const g = Math.round(startColor.g + (endColor.g - startColor.g) * segmentProgress);
+                const b = Math.round(startColor.b + (endColor.b - startColor.b) * segmentProgress);
+                
+                colors[i.toString()] = `rgb(${r}, ${g}, ${b})`;
+            }
+            
+            // FGI gets a blue
+            const fgiProgress = numPositions / (totalItems - 1);
+            colors['FGI'] = interpolateColor(rainbowColors, fgiProgress);
+            
+            // Delivery gets purple
+            colors['Delivery'] = `rgb(${rainbowColors[5].r}, ${rainbowColors[5].g}, ${rainbowColors[5].b})`;
+            
+            return colors;
+        }
+        
+        // Helper function to interpolate colors
+        function interpolateColor(colorArray, progress) {
+            const segmentLength = 1 / (colorArray.length - 1);
+            const segmentIndex = Math.floor(progress / segmentLength);
+            const segmentProgress = (progress % segmentLength) / segmentLength;
+            
+            const startColor = colorArray[Math.min(segmentIndex, colorArray.length - 1)];
+            const endColor = colorArray[Math.min(segmentIndex + 1, colorArray.length - 1)];
+            
+            const r = Math.round(startColor.r + (endColor.r - startColor.r) * segmentProgress);
+            const g = Math.round(startColor.g + (endColor.g - startColor.g) * segmentProgress);
+            const b = Math.round(startColor.b + (endColor.b - startColor.b) * segmentProgress);
+            
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        
+        // Apply dynamic colors to positions
+        function applyPositionColors(numPositions) {
+            const baseColors = generatePositionColors(numPositions);
+            const styleElement = document.getElementById('dynamicPositionColors') || 
+                                document.createElement('style');
+            styleElement.id = 'dynamicPositionColors';
+            
+            let cssRules = '';
+            
+            // Get the actual number of lines being used
+            const numLines = parseInt(document.getElementById('numLines').value);
+            const lines = ['A', 'B', 'C', 'D'].slice(0, numLines);
+            
+            // Dynamically calculate shade factors based on number of lines
+            // More lines = smaller differences, fewer lines = bigger differences
+            const shadeFactors = [];
+            for (let i = 0; i < numLines; i++) {
+                if (numLines === 1) {
+                    shadeFactors.push(1);
+                } else if (numLines === 2) {
+                    // For 2 lines: maximum contrast [1.0 (darkest), 0.3 (very light)]
+                    shadeFactors.push(i === 0 ? 1 : 0.3);
+                } else if (numLines === 3) {
+                    // For 3 lines: good spacing [1.0, 0.55, 0.25]
+                    shadeFactors.push([1, 0.55, 0.25][i]);
+                } else if (numLines === 4) {
+                    // For 4 lines: evenly spaced [1.0, 0.65, 0.4, 0.2]
+                    shadeFactors.push([1, 0.65, 0.4, 0.2][i]);
+                }
+            }
+            
+            lines.forEach((line, lineIndex) => {
+                const shadeFactor = shadeFactors[lineIndex];
+                
+                Object.entries(baseColors).forEach(([position, color]) => {
+                    // Parse RGB values
+                    const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+                    if (match) {
+                        let r = parseInt(match[1]);
+                        let g = parseInt(match[2]);
+                        let b = parseInt(match[3]);
+                        
+                        // Apply shade factor (lighten for lighter lines)
+                        if (lineIndex > 0) {
+                            // Mix with white based on shade factor
+                            r = Math.round(r * shadeFactor + 255 * (1 - shadeFactor));
+                            g = Math.round(g * shadeFactor + 255 * (1 - shadeFactor));
+                            b = Math.round(b * shadeFactor + 255 * (1 - shadeFactor));
+                        }
+                        
+                        // Check if color is too light for text contrast
+                        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                        const textColor = brightness > 155 ? '#333' : 'white';
+                        
+                        cssRules += `.gantt-bar.line-${line}.pos-${position} { 
+                            background: rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}); 
+                            color: ${textColor};
+                        }\n`;
+                    }
+                });
+            });
+            
+            styleElement.textContent = cssRules;
+            if (!document.getElementById('dynamicPositionColors')) {
+                document.head.appendChild(styleElement);
+            }
+        }
+
+        // Update legend based on number of positions
+        function updateLegend(positions) {
+            const legendContent = document.getElementById('legendContent');
+            legendContent.innerHTML = '';
+            
+            const numPositions = positions.filter(p => p !== 'FGI' && p !== 'Delivery').length;
+            const colors = generatePositionColors(numPositions);
+            const numLines = parseInt(document.getElementById('numLines').value);
+            
+            // Update legend title based on number of lines
+            const legendTitle = document.querySelector('.legend-title');
+            if (numLines === 2) {
+                legendTitle.textContent = 'Position Colors (Line A Dark / Line B Light):';
+            } else if (numLines === 3) {
+                legendTitle.textContent = 'Position Colors (Lines A→C Dark to Light):';
+            } else if (numLines === 4) {
+                legendTitle.textContent = 'Position Colors (Lines A→D Dark to Light):';
+            } else {
+                legendTitle.textContent = 'Position Colors:';
+            }
+            
+            positions.forEach(pos => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                const color = colors[pos] || '#999';
+                
+                // Format label text
+                let labelText = pos;
+                if (pos !== 'FGI' && pos !== 'Delivery') {
+                    labelText = `Position ${pos}`;
+                }
+                
+                item.innerHTML = `<span class="legend-color" style="background: ${color};"></span>${labelText}`;
+                legendContent.appendChild(item);
+            });
+            
+            // Apply the dynamic colors
+            applyPositionColors(numPositions);
+        }
+
+        // Render the Gantt chart
+        function renderGantt() {
+            if (schedule.length === 0) return;
+            
+            // Find the overall date range - ensure dates are at midnight
+            startDate = new Date(schedule[0].positions['0'].start);
+            startDate.setHours(0, 0, 0, 0);
+            
+            endDate = new Date(startDate);
+            
+            schedule.forEach(product => {
+                const deliveryEnd = new Date(product.positions['Delivery'].end);
+                if (deliveryEnd > endDate) {
+                    endDate = new Date(deliveryEnd);
+                }
+            });
+            
+            // Add some buffer days
+            endDate.setDate(endDate.getDate() + 30);
+            
+            // Generate timeline header
+            const headerTimeline = document.getElementById('ganttHeaderTimeline');
+            headerTimeline.innerHTML = '';
+            
+            let currentDate = new Date(startDate);
+            currentDate.setHours(0, 0, 0, 0);
+            let dayIndex = 0;
+            
+            while (currentDate <= endDate) {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'gantt-day-header';
+                dayHeader.dataset.date = formatDate(currentDate);
+                dayHeader.dataset.index = dayIndex;
+                
+                // Format display
+                const month = currentDate.getMonth() + 1;
+                const day = currentDate.getDate();
+                dayHeader.innerHTML = `${month}/${day}<br>${currentDate.toLocaleDateString('en-US', {weekday: 'short'}).substring(0,2)}`;
+                
+                // Apply styling for non-working days
+                if (isWeekend(currentDate)) {
+                    dayHeader.classList.add('weekend');
+                }
+                if (isHoliday(currentDate)) {
+                    dayHeader.classList.add('holiday');
+                }
+                if (isVerticalDay(currentDate)) {
+                    dayHeader.classList.add('vertical-day');
+                }
+                
+                // Add context menu on right-click
+                dayHeader.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    showContextMenu(e, this.dataset.date);
+                });
+                
+                headerTimeline.appendChild(dayHeader);
+                
+                currentDate.setDate(currentDate.getDate() + 1);
+                dayIndex++;
+            }
+            
+            // Generate body rows
+            const ganttBody = document.getElementById('ganttBody');
+            ganttBody.innerHTML = '';
+            
+            schedule.forEach((product, productIndex) => {
+                const row = document.createElement('div');
+                row.className = 'gantt-row';
+                row.dataset.productId = product.id;
+                
+                // Product label
+                const label = document.createElement('div');
+                label.className = 'gantt-product-label';
+                label.textContent = `Product ${product.id} - Line ${product.line}`;
+                row.appendChild(label);
+                
+                // Timeline
+                const timeline = document.createElement('div');
+                timeline.className = 'gantt-timeline';
+                
+                // Add day cells
+                currentDate = new Date(startDate);
+                currentDate.setHours(0, 0, 0, 0);
+                dayIndex = 0;
+                
+                while (currentDate <= endDate) {
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'gantt-day-cell';
+                    dayCell.dataset.date = formatDate(currentDate);
+                    dayCell.dataset.index = dayIndex;
+                    
+                    if (isWeekend(currentDate)) {
+                        dayCell.classList.add('weekend');
+                    }
+                    if (isHoliday(currentDate)) {
+                        dayCell.classList.add('holiday');
+                    }
+                    if (isVerticalDay(currentDate)) {
+                        dayCell.classList.add('vertical-day');
+                    }
+                    if (isLineNonWorkingDay(currentDate, product.line)) {
+                        dayCell.classList.add('vertical-day');
+                    }
+                    
+                    timeline.appendChild(dayCell);
+                    
+                    currentDate.setDate(currentDate.getDate() + 1);
+                    dayIndex++;
+                }
+                
+                row.appendChild(timeline);
+                
+                // Add position bars
+                Object.entries(product.positions).forEach(([posName, posData]) => {
+                    const bar = createGanttBar(product, posName, posData);
+                    timeline.appendChild(bar);
+                });
+                
+                ganttBody.appendChild(row);
+            });
+        }
+        
+        // Handle dragging of individual days - No longer needed, removed drag functionality
+        
+        // Apply horizontal delay from a specific day within a position
+        function applyHorizontalDelayFromDay(productId, positionName, dayNumber, delayDays) {
+            const product = schedule.find(p => p.id === productId);
+            if (!product) return;
+            
+            // Save state before making changes
+            saveStateForUndo(`Drag delay: ${delayDays} days to Product ${productId}, ${positionName} day ${dayNumber}`);
+            
+            // Add horizontal days for this product starting from the specified day
+            if (!horizontalDays[productId]) {
+                horizontalDays[productId] = [];
+            }
+            
+            // Find the date of the specified working day
+            const position = product.positions[positionName];
+            let workingDayCount = 0;
+            let targetDate = null;
+            let currentDate = new Date(position.start);
+            
+            while (currentDate <= position.end && workingDayCount < dayNumber) {
+                if (!isWeekend(currentDate) && !isHoliday(currentDate) && 
+                    !isVerticalDay(currentDate) && !isLineNonWorkingDay(currentDate, product.line) && 
+                    !isHorizontalDay(currentDate, productId)) {
+                    workingDayCount++;
+                    if (workingDayCount === dayNumber) {
+                        targetDate = new Date(currentDate);
+                        break;
+                    }
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            if (!targetDate) return;
+            
+            // Add delay days starting from the target date
+            for (let i = 0; i < delayDays; i++) {
+                const delayDate = new Date(targetDate);
+                delayDate.setDate(delayDate.getDate() + i);
+                horizontalDays[productId].push(formatDate(delayDate));
+            }
+            
+            // Recalculate schedule with cascading effect
+            cascadeSchedule(product.line, productId);
+            
+            renderGantt();
+            updateStats();
+            showToast(`Applied ${delayDays} day delay to Product ${productId} starting from day ${dayNumber} of ${positionName}`);
+        }
+
+        // Create a Gantt bar for a position
+        function createGanttBar(product, positionName, positionData) {
+            const bar = document.createElement('div');
+            bar.className = `gantt-bar line-${product.line} pos-${positionName}`;
+            // Position must be absolute for bars to be placed correctly on timeline
+            bar.style.position = 'absolute';
+            bar.style.zIndex = '5';
+            
+            // Format position label
+            let barLabel = positionName;
+            if (positionName !== 'FGI' && positionName !== 'Delivery') {
+                barLabel = `Pos ${positionName}`;
+            }
+            
+            bar.dataset.productId = product.id;
+            bar.dataset.position = positionName;
+            bar.dataset.line = product.line;
+            bar.dataset.startDate = formatDate(positionData.start);
+            bar.dataset.endDate = formatDate(positionData.end);
+            
+            // Calculate position - ensure proper alignment with start date
+            const msPerDay = 1000 * 60 * 60 * 24;
+            
+            // Normalize dates to midnight for accurate calculation
+            const barStart = new Date(positionData.start);
+            barStart.setHours(0, 0, 0, 0);
+            let barEnd = new Date(positionData.end);
+            barEnd.setHours(0, 0, 0, 0);
+            let actualEnd = new Date(positionData.end); // Keep track of actual end
+            actualEnd.setHours(0, 0, 0, 0);
+            
+            // Extend the visual bar end if the next position doesn't start immediately
+            // This fills gaps over weekends/holidays for visual continuity
+            const positionOrder = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'FGI', 'Delivery'];
+            const currentPosIndex = positionOrder.indexOf(positionName);
+            let isExtended = false;
+            if (currentPosIndex < positionOrder.length - 1) {
+                // Find the next position that exists in this product
+                let nextPos = null;
+                for (let i = currentPosIndex + 1; i < positionOrder.length; i++) {
+                    if (product.positions[positionOrder[i]]) {
+                        nextPos = positionOrder[i];
+                        break;
+                    }
+                }
+                
+                if (nextPos) {
+                    const nextStart = new Date(product.positions[nextPos].start);
+                    nextStart.setHours(0, 0, 0, 0);
+                    
+                    // Check if there's a gap between end and next start
+                    const dayAfterEnd = new Date(barEnd);
+                    dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+                    
+                    if (dayAfterEnd < nextStart) {
+                        // Extend the visual bar to the day before the next position starts
+                        barEnd = new Date(nextStart);
+                        barEnd.setDate(barEnd.getDate() - 1);
+                        isExtended = true;
+                        
+                        // Add a class to indicate this bar has been extended
+                        bar.classList.add('extended');
+                    }
+                }
+            }
+            
+            const chartStart = new Date(startDate);
+            chartStart.setHours(0, 0, 0, 0);
+            
+            const startDiff = barStart - chartStart;
+            const startDays = Math.floor(startDiff / msPerDay);
+            const endDiff = barEnd - barStart;
+            const duration = Math.floor(endDiff / msPerDay) + 1;
+            
+            bar.style.left = `${startDays * 30}px`;
+            bar.style.width = `${duration * 30 - 4}px`;
+            
+            // Add individual day segments for all days in the visual bar (including extensions)
+            let currentDate = new Date(barStart);
+            let dayIndex = 0;
+            let workingDayNumber = 1;
+            
+            while (currentDate <= barEnd) {
+                const dateStr = formatDate(currentDate);
+                const isProductNonWorking = horizontalDays[product.id] && horizontalDays[product.id].includes(dateStr);
+                const isWorkingDay = !isWeekend(currentDate) && !isHoliday(currentDate) && 
+                    !isVerticalDay(currentDate) && !isLineNonWorkingDay(currentDate, product.line) && 
+                    !isProductNonWorking;
+                
+                // Create a day segment for both working and non-working days within the bar
+                const daySegment = document.createElement('div');
+                daySegment.className = 'gantt-bar-day';
+                if (isProductNonWorking && currentDate <= actualEnd) {
+                    daySegment.classList.add('product-non-working');
+                }
+                daySegment.style.left = `${dayIndex * 30}px`;
+                daySegment.dataset.productId = product.id;
+                daySegment.dataset.position = positionName;
+                daySegment.dataset.date = dateStr;
+                
+                if (isWorkingDay && currentDate <= actualEnd) {
+                    // This is an actual working day within the position
+                    daySegment.dataset.dayNumber = workingDayNumber;
+                    daySegment.title = `Day ${workingDayNumber} - Right-click to toggle`;
+                    
+                    // Add day number label for working days
+                    const dayLabel = document.createElement('span');
+                    dayLabel.className = 'gantt-bar-day-number';
+                    dayLabel.textContent = workingDayNumber;
+                    daySegment.appendChild(dayLabel);
+                    
+                    // No drag functionality - only right-click
+                    daySegment.style.cursor = 'pointer';
+                    
+                    // Add right-click context menu
+                    daySegment.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showDayContextMenu(e, product.id, dateStr, positionName);
+                    });
+                    
+                    workingDayNumber++;
+                } else {
+                    // Non-working day or extended day
+                    daySegment.style.cursor = 'default';
+                    daySegment.style.opacity = '0.5';
+                    
+                    if (currentDate > actualEnd) {
+                        daySegment.title = 'Extended through gap';
+                    } else if (isProductNonWorking) {
+                        daySegment.title = 'Product-specific non-working day - right-click to toggle';
+                    } else {
+                        daySegment.title = 'Non-working day - right-click to toggle';
+                    }
+                    
+                    // Add right-click for non-working days within the actual position duration
+                    if (currentDate <= actualEnd) {
+                        daySegment.style.cursor = 'pointer';
+                        
+                        daySegment.addEventListener('contextmenu', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            showDayContextMenu(e, product.id, dateStr, positionName);
+                        });
+                    }
+                }
+                
+                bar.appendChild(daySegment);
+                currentDate.setDate(currentDate.getDate() + 1);
+                dayIndex++;
+            }
+            
+            // Add the position label as an overlay
+            const labelOverlay = document.createElement('div');
+            labelOverlay.style.position = 'absolute';
+            labelOverlay.style.top = '0';
+            labelOverlay.style.left = '0';
+            labelOverlay.style.padding = '0 5px';
+            labelOverlay.style.height = '100%';
+            labelOverlay.style.display = 'flex';
+            labelOverlay.style.alignItems = 'center';
+            labelOverlay.style.pointerEvents = 'none';
+            labelOverlay.style.fontSize = '11px';
+            labelOverlay.style.fontWeight = '600';
+            labelOverlay.style.textShadow = '0 1px 2px rgba(0,0,0,0.3)';
+            labelOverlay.style.zIndex = '10';
+            labelOverlay.textContent = barLabel;
+            bar.appendChild(labelOverlay);
+            
+            // Add tooltip events to the bar itself
+            bar.addEventListener('mouseenter', handleBarMouseEnter);
+            bar.addEventListener('mousemove', handleBarMouseMove);
+            bar.addEventListener('mouseleave', handleBarMouseLeave);
+            
+            return bar;
+        }
+        
+        let tooltipTimeout = null;
+        
+        // Tooltip handlers
+        function handleBarMouseEnter(e) {
+            // Clear any pending hide timeout
+            if (tooltipTimeout) {
+                clearTimeout(tooltipTimeout);
+                tooltipTimeout = null;
+            }
+            
+            // Get the actual bar element (might be triggered by child elements)
+            let bar = e.currentTarget;
+            if (!bar.dataset.productId) {
+                bar = bar.closest('.gantt-bar');
+            }
+            if (!bar) return;
+            
+            const tooltip = document.getElementById('tooltip');
+            
+            // Calculate working days
+            const product = schedule.find(p => p.id === parseInt(bar.dataset.productId));
+            const position = bar.dataset.position;
+            const workingDays = product.positions[position].days;
+            
+            // Format position name
+            let positionDisplay = position;
+            if (position !== 'FGI' && position !== 'Delivery') {
+                positionDisplay = `Position ${position}`;
+            }
+            
+            // Format dates nicely - parse date string to avoid timezone issues
+            const startDateParts = bar.dataset.startDate.split('-').map(Number);
+            const startDate = new Date(startDateParts[0], startDateParts[1] - 1, startDateParts[2]);
+            const endDateParts = bar.dataset.endDate.split('-').map(Number);
+            const endDate = new Date(endDateParts[0], endDateParts[1] - 1, endDateParts[2]);
+            
+            // Short date format
+            const shortFormat = { month: '2-digit', day: '2-digit', year: 'numeric' };
+            const startShort = startDate.toLocaleDateString('en-US', shortFormat);
+            const endShort = endDate.toLocaleDateString('en-US', shortFormat);
+            
+            // Calculate calendar days
+            const calendarDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+            
+            // Build tooltip content
+            const tooltipHTML = `
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Product:</span>
+                    <span class="tooltip-value">${bar.dataset.productId}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Line:</span>
+                    <span class="tooltip-value">${bar.dataset.line}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Position:</span>
+                    <span class="tooltip-value">${positionDisplay}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Start:</span>
+                    <span class="tooltip-value">${startShort}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">End:</span>
+                    <span class="tooltip-value">${endShort}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Duration:</span>
+                    <span class="tooltip-value">${workingDays} working / ${calendarDays} calendar days</span>
+                </div>
+                ${bar.classList.contains('extended') ? `
+                <div class="tooltip-row" style="font-size: 10px; color: #aaa; margin-top: 4px;">
+                    <span style="font-style: italic;">* Bar extended through weekend/holiday</span>
+                </div>` : ''}
+            `;
+            
+            tooltip.innerHTML = tooltipHTML;
+            tooltip.classList.add('show');
+            
+            // Initial position
+            handleBarMouseMove(e);
+        }
+
+        function handleBarMouseMove(e) {
+            const tooltip = document.getElementById('tooltip');
+            
+            // Position tooltip near cursor but offset to avoid interference
+            let x = e.clientX + 15;
+            let y = e.clientY - tooltip.offsetHeight - 10;
+            
+            // Adjust if tooltip would go off-screen
+            if (x + tooltip.offsetWidth > window.innerWidth) {
+                x = e.clientX - tooltip.offsetWidth - 15;
+            }
+            
+            if (y < 0) {
+                y = e.clientY + 20;
+            }
+            
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+
+        function handleBarMouseLeave(e) {
+            const tooltip = document.getElementById('tooltip');
+            // Immediate hide for better responsiveness
+            tooltip.classList.remove('show');
+        }
+
+        // Apply horizontal delay to a product and cascade
+        function applyHorizontalDelay(productId, position, dayOffset) {
+            const product = schedule.find(p => p.id === productId);
+            if (!product) return;
+            
+            const originalStart = product.positions[position].start;
+            const newStart = new Date(startDate);
+            newStart.setDate(newStart.getDate() + dayOffset);
+            
+            const delayDays = Math.floor((newStart - originalStart) / (1000 * 60 * 60 * 24));
+            
+            if (delayDays <= 0) return; // No delay or moving backward
+            
+            // Add horizontal days for this product
+            if (!horizontalDays[productId]) {
+                horizontalDays[productId] = [];
+            }
+            
+            // Add delay days
+            let delayDate = new Date(originalStart);
+            for (let i = 0; i < delayDays; i++) {
+                horizontalDays[productId].push(formatDate(delayDate));
+                delayDate.setDate(delayDate.getDate() + 1);
+            }
+            
+            // Recalculate schedule with cascading effect
+            cascadeSchedule(product.line, productId);
+            
+            renderGantt();
+            updateStats();
+            showToast(`Applied ${delayDays} day delay to Product ${productId}`);
+        }
+
+        // Cascade schedule changes for products on the same line
+        function cascadeSchedule(line, startingProductId) {
+            const lineProducts = schedule.filter(p => p.line === line);
+            const startIndex = lineProducts.findIndex(p => p.id === startingProductId);
+            
+            if (startIndex === -1) return;
+            
+            // Recalculate affected product and all subsequent products on the same line
+            for (let i = startIndex; i < lineProducts.length; i++) {
+                const product = lineProducts[i];
+                
+                // Generate positions dynamically based on what's in the product
+                const positions = Object.keys(product.positions).sort((a, b) => {
+                    // Sort positions in order: 0, 1, 2, ..., FGI, Delivery
+                    if (a === 'Delivery') return 1;
+                    if (b === 'Delivery') return -1;
+                    if (a === 'FGI') return 1;
+                    if (b === 'FGI') return -1;
+                    return parseInt(a) - parseInt(b);
+                });
+                
+                if (i === startIndex) {
+                    // Recalculate the affected product
+                    let positionStart = new Date(product.positions['0'].start);
+                    positionStart.setHours(0, 0, 0, 0);
+                    
+                    positions.forEach((pos, posIndex) => {
+                        const daysInPosition = product.positions[pos].days;
+                        const positionEnd = addWorkingDays(positionStart, daysInPosition - 1, line, product.id);
+                        
+                        product.positions[pos].start = new Date(positionStart);
+                        product.positions[pos].end = new Date(positionEnd);
+                        
+                        positionStart = addWorkingDays(positionEnd, 1, line, product.id);
+                    });
+                } else {
+                    // Next product starts when previous leaves position 0
+                    const prevProduct = lineProducts[i - 1];
+                    let positionStart = addWorkingDays(prevProduct.positions['0'].end, 1, line, product.id);
+                    positionStart.setHours(0, 0, 0, 0);
+                    
+                    positions.forEach((pos, posIndex) => {
+                        const daysInPosition = product.positions[pos].days;
+                        const positionEnd = addWorkingDays(positionStart, daysInPosition - 1, line, product.id);
+                        
+                        product.positions[pos].start = new Date(positionStart);
+                        product.positions[pos].end = new Date(positionEnd);
+                        
+                        positionStart = addWorkingDays(positionEnd, 1, line, product.id);
+                    });
+                }
+            }
+        }
+
+        // Context menu functions
+        function showContextMenu(e, date) {
+            const menu = document.getElementById('contextMenu');
+            menu.style.display = 'block';
+            
+            // Position the menu at the cursor location
+            let x = e.clientX;
+            let y = e.clientY;
+            
+            // Adjust if menu would go off-screen
+            const menuRect = menu.getBoundingClientRect();
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            if (x + menu.offsetWidth > windowWidth) {
+                x = windowWidth - menu.offsetWidth - 5;
+            }
+            
+            if (y + menu.offsetHeight > windowHeight) {
+                y = windowHeight - menu.offsetHeight - 5;
+            }
+            
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            
+            currentContextDate = date;
+            
+            // Hide submenu items based on active lines
+            const numLines = parseInt(document.getElementById('numLines').value);
+            const lineSubmenu = document.getElementById('lineSubmenu');
+            const lineItems = lineSubmenu.children;
+            for (let i = 0; i < lineItems.length; i++) {
+                if (i < numLines) {
+                    lineItems[i].style.display = 'block';
+                } else {
+                    lineItems[i].style.display = 'none';
+                }
+            }
+        }
+        
+        // Show context menu for individual product days
+        function showDayContextMenu(e, productId, date, position) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const menu = document.getElementById('dayContextMenu');
+            const toggleItem = document.getElementById('toggleDayItem');
+            
+            // Store context for the action
+            currentDayContextProduct = productId;
+            currentDayContextDate = date;
+            currentDayContextPosition = position;
+            
+            // Check if this day is already a non-working day for this product
+            const isNonWorking = horizontalDays[productId] && horizontalDays[productId].includes(date);
+            
+            // Update menu text based on current state
+            toggleItem.textContent = isNonWorking ? 'Make Working Day' : 'Make Non-Working Day';
+            
+            menu.style.display = 'block';
+            
+            // Position the menu at the cursor location
+            let x = e.clientX;
+            let y = e.clientY;
+            
+            // Adjust if menu would go off-screen
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            if (x + menu.offsetWidth > windowWidth) {
+                x = windowWidth - menu.offsetWidth - 5;
+            }
+            
+            if (y + menu.offsetHeight > windowHeight) {
+                y = windowHeight - menu.offsetHeight - 5;
+            }
+            
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+        
+        // Toggle a specific day for a specific product
+        function toggleProductDay() {
+            if (!currentDayContextProduct || !currentDayContextDate) return;
+            
+            const productId = currentDayContextProduct;
+            const date = currentDayContextDate;
+            
+            if (!horizontalDays[productId]) {
+                horizontalDays[productId] = [];
+            }
+            
+            const isNonWorking = horizontalDays[productId].includes(date);
+            
+            if (isNonWorking) {
+                // Make it a working day - remove from horizontal days
+                saveStateForUndo(`Make working day: Product ${productId} on ${date}`);
+                const index = horizontalDays[productId].indexOf(date);
+                if (index > -1) {
+                    horizontalDays[productId].splice(index, 1);
+                }
+                showToast(`Made ${date} a working day for Product ${productId}`);
+            } else {
+                // Make it a non-working day - add to horizontal days
+                saveStateForUndo(`Make non-working day: Product ${productId} on ${date}`);
+                horizontalDays[productId].push(date);
+                showToast(`Made ${date} a non-working day for Product ${productId}`);
+            }
+            
+            // Recalculate the schedule for this product and cascade
+            const product = schedule.find(p => p.id === productId);
+            if (product) {
+                cascadeSchedule(product.line, productId);
+            }
+            
+            renderGantt();
+            updateStats();
+            closeDayContextMenu();
+        }
+        
+        function closeDayContextMenu() {
+            document.getElementById('dayContextMenu').style.display = 'none';
+            currentDayContextProduct = null;
+            currentDayContextDate = null;
+            currentDayContextPosition = null;
+        }
+
+        function showLineSubmenu(e) {
+            const submenu = e.currentTarget.querySelector('.submenu');
+            if (submenu) {
+                submenu.style.display = 'block';
+            }
+        }
+
+        function closeContextMenu() {
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        // Add vertical day (all lines)
+        function addVerticalDay() {
+            if (!verticalDays.includes(currentContextDate)) {
+                saveStateForUndo(`Add vertical non-working day: ${currentContextDate}`);
+                verticalDays.push(currentContextDate);
+                regenerateWithNonWorkingDays();
+                showToast(`Added vertical non-working day: ${currentContextDate}`);
+            }
+            closeContextMenu();
+        }
+
+        // Add line-specific non-working day
+        function addLineNonWorkingDay(line) {
+            if (!lineSpecificNonWorkingDays[line]) {
+                lineSpecificNonWorkingDays[line] = [];
+            }
+            if (!lineSpecificNonWorkingDays[line].includes(currentContextDate)) {
+                saveStateForUndo(`Add non-working day for Line ${line}: ${currentContextDate}`);
+                lineSpecificNonWorkingDays[line].push(currentContextDate);
+                regenerateWithNonWorkingDays();
+                showToast(`Added non-working day for Line ${line}: ${currentContextDate}`);
+            }
+            closeContextMenu();
+        }
+
+        // Remove non-working day
+        function removeNonWorkingDay() {
+            let removed = false;
+            
+            // Check if there's anything to remove first
+            if (verticalDays.includes(currentContextDate) || 
+                Object.keys(lineSpecificNonWorkingDays).some(line => 
+                    lineSpecificNonWorkingDays[line] && lineSpecificNonWorkingDays[line].includes(currentContextDate)
+                )) {
+                
+                saveStateForUndo(`Remove non-working day: ${currentContextDate}`);
+                
+                // Remove from vertical days
+                const vIndex = verticalDays.indexOf(currentContextDate);
+                if (vIndex > -1) {
+                    verticalDays.splice(vIndex, 1);
+                    removed = true;
+                }
+                
+                // Remove from line-specific days
+                Object.keys(lineSpecificNonWorkingDays).forEach(line => {
+                    const index = lineSpecificNonWorkingDays[line].indexOf(currentContextDate);
+                    if (index > -1) {
+                        lineSpecificNonWorkingDays[line].splice(index, 1);
+                        removed = true;
+                    }
+                });
+                
+                if (removed) {
+                    regenerateWithNonWorkingDays();
+                    showToast(`Removed non-working day: ${currentContextDate}`);
+                }
+            }
+            
+            closeContextMenu();
+        }
+
+        // Regenerate schedule with non-working days
+        function regenerateWithNonWorkingDays() {
+            generateSchedule();
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('totalProducts').textContent = schedule.length;
+            
+            if (schedule.length > 0) {
+                const lastProduct = schedule[schedule.length - 1];
+                const duration = Math.floor((lastProduct.positions['Delivery'].end - startDate) / (1000 * 60 * 60 * 24));
+                document.getElementById('scheduleDuration').textContent = `${duration} days`;
+            }
+            
+            const totalNonWorking = verticalDays.length + 
+                Object.values(lineSpecificNonWorkingDays).reduce((sum, days) => sum + days.length, 0) +
+                Object.values(horizontalDays).reduce((sum, days) => sum + days.length, 0);
+            document.getElementById('nonWorkingDays').textContent = totalNonWorking;
+        }
+
+        // Save/Load functionality
+        function saveSchedule() {
+            document.getElementById('saveModal').style.display = 'block';
+        }
+
+        function confirmSave() {
+            const name = document.getElementById('saveName').value;
+            if (!name) {
+                alert('Please enter a name for the schedule');
+                return;
+            }
+            
+            const data = {
+                name: name,
+                date: new Date().toISOString(),
+                schedule: schedule,
+                verticalDays: verticalDays,
+                lineSpecificNonWorkingDays: lineSpecificNonWorkingDays,
+                horizontalDays: horizontalDays,
+                settings: {
+                    daysPerPosition: document.getElementById('daysPerPosition').value,
+                    daysFGItoDelivery: document.getElementById('daysFGItoDelivery').value,
+                    numLines: document.getElementById('numLines').value,
+                    numPositions: document.getElementById('numPositions').value,
+                    productsPerLine: document.getElementById('productsPerLine').value,
+                    startDateA: document.getElementById('startDateA').value,
+                    startDateB: document.getElementById('startDateB').value,
+                    startDateC: document.getElementById('startDateC').value,
+                    startDateD: document.getElementById('startDateD').value
+                }
+            };
+            
+            // Save to localStorage
+            let savedSchedules = JSON.parse(localStorage.getItem('manufacturingSchedules') || '{}');
+            savedSchedules[name] = data;
+            localStorage.setItem('manufacturingSchedules', JSON.stringify(savedSchedules));
+            
+            closeSaveModal();
+            showToast(`Schedule "${name}" saved successfully`);
+        }
+
+        function closeSaveModal() {
+            document.getElementById('saveModal').style.display = 'none';
+            document.getElementById('saveName').value = '';
+        }
+
+        function loadSchedule() {
+            const savedSchedules = JSON.parse(localStorage.getItem('manufacturingSchedules') || '{}');
+            const select = document.getElementById('loadSelect');
+            select.innerHTML = '';
+            
+            Object.keys(savedSchedules).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = `${name} (${new Date(savedSchedules[name].date).toLocaleDateString()})`;
+                select.appendChild(option);
+            });
+            
+            if (select.options.length === 0) {
+                alert('No saved schedules found');
+                return;
+            }
+            
+            document.getElementById('loadModal').style.display = 'block';
+        }
+
+        function confirmLoad() {
+            const select = document.getElementById('loadSelect');
+            const name = select.value;
+            
+            const savedSchedules = JSON.parse(localStorage.getItem('manufacturingSchedules') || '{}');
+            const data = savedSchedules[name];
+            
+            if (!data) return;
+            
+            // Restore schedule data with proper date parsing
+            schedule = data.schedule.map(product => ({
+                ...product,
+                positions: Object.fromEntries(
+                    Object.entries(product.positions).map(([pos, data]) => {
+                        // Parse date strings properly to avoid timezone issues
+                        let startDate, endDate;
+                        
+                        if (typeof data.start === 'string') {
+                            // If it's an ISO string, parse it properly
+                            const startMatch = data.start.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (startMatch) {
+                                startDate = new Date(parseInt(startMatch[1]), parseInt(startMatch[2]) - 1, parseInt(startMatch[3]));
+                            } else {
+                                startDate = new Date(data.start);
+                            }
+                        } else {
+                            startDate = new Date(data.start);
+                        }
+                        
+                        if (typeof data.end === 'string') {
+                            const endMatch = data.end.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (endMatch) {
+                                endDate = new Date(parseInt(endMatch[1]), parseInt(endMatch[2]) - 1, parseInt(endMatch[3]));
+                            } else {
+                                endDate = new Date(data.end);
+                            }
+                        } else {
+                            endDate = new Date(data.end);
+                        }
+                        
+                        return [
+                            pos,
+                            {
+                                ...data,
+                                start: startDate,
+                                end: endDate
+                            }
+                        ];
+                    })
+                )
+            }));
+            
+            verticalDays = data.verticalDays || [];
+            lineSpecificNonWorkingDays = data.lineSpecificNonWorkingDays || {};
+            horizontalDays = data.horizontalDays || {};
+            
+            // Restore settings
+            document.getElementById('daysPerPosition').value = data.settings.daysPerPosition;
+            document.getElementById('daysFGItoDelivery').value = data.settings.daysFGItoDelivery;
+            document.getElementById('numLines').value = data.settings.numLines;
+            document.getElementById('numPositions').value = data.settings.numPositions || 4; // Default to 4 for backwards compatibility
+            document.getElementById('productsPerLine').value = data.settings.productsPerLine;
+            
+            // Restore individual line start dates (with backwards compatibility)
+            if (data.settings.startDateA) {
+                document.getElementById('startDateA').value = data.settings.startDateA;
+                document.getElementById('startDateB').value = data.settings.startDateB;
+                document.getElementById('startDateC').value = data.settings.startDateC;
+                document.getElementById('startDateD').value = data.settings.startDateD;
+            } else if (data.settings.startDate) {
+                // Backwards compatibility: use old single start date for line A
+                document.getElementById('startDateA').value = data.settings.startDate;
+            }
+            
+            // Update visibility of line start dates
+            updateLineStartDates();
+            
+            closeLoadModal();
+            renderGantt();
+            updateStats();
+            showToast(`Schedule "${name}" loaded successfully`);
+        }
+
+        function closeLoadModal() {
+            document.getElementById('loadModal').style.display = 'none';
+        }
+
+        // Export to Excel - FIXED to handle dynamic positions
+        function exportToExcel() {
+            if (schedule.length === 0) {
+                alert('No schedule to export');
+                return;
+            }
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Sheet 1: Main Schedule - dynamically build headers based on actual positions
+            const positions = Object.keys(schedule[0].positions); // Get actual positions from first product
+            const scheduleHeaders = ['Product', 'Assembly Line'];
+            
+            // Add headers for each position
+            positions.forEach(pos => {
+                const posLabel = (pos !== 'FGI' && pos !== 'Delivery') ? `Position ${pos}` : pos;
+                scheduleHeaders.push(`${posLabel} Start`, `${posLabel} End`);
+            });
+            
+            const scheduleData = [scheduleHeaders];
+            
+            schedule.forEach(product => {
+                const row = [product.id, product.line];
+                
+                // Add data for each position
+                positions.forEach(pos => {
+                    row.push(
+                        formatDate(product.positions[pos].start),
+                        formatDate(product.positions[pos].end)
+                    );
+                });
+                
+                scheduleData.push(row);
+            });
+            
+            const ws1 = XLSX.utils.aoa_to_sheet(scheduleData);
+            XLSX.utils.book_append_sheet(wb, ws1, 'Schedule');
+            
+            // Sheet 2: Non-Working Days per Product
+            const nonWorkingData = [['Product', 'Non-Working Days', 'Count']];
+            
+            schedule.forEach(product => {
+                const productNonWorking = new Set();
+                
+                // Add vertical days
+                verticalDays.forEach(day => productNonWorking.add(day));
+                
+                // Add line-specific days
+                if (lineSpecificNonWorkingDays[product.line]) {
+                    lineSpecificNonWorkingDays[product.line].forEach(day => productNonWorking.add(day));
+                }
+                
+                // Add horizontal days
+                if (horizontalDays[product.id]) {
+                    horizontalDays[product.id].forEach(day => productNonWorking.add(day));
+                }
+                
+                const days = Array.from(productNonWorking).sort().join(', ') || 'None';
+                nonWorkingData.push([product.id, days, productNonWorking.size]);
+            });
+            
+            const ws2 = XLSX.utils.aoa_to_sheet(nonWorkingData);
+            XLSX.utils.book_append_sheet(wb, ws2, 'Non-Working Days');
+            
+            // Sheet 3: Working Days per Product
+            const workingDaysData = [['Product', 'Position', 'Working Days', 'Calendar Days']];
+            
+            schedule.forEach(product => {
+                Object.entries(product.positions).forEach(([pos, data]) => {
+                    const calendarDays = Math.floor((data.end - data.start) / (1000 * 60 * 60 * 24)) + 1;
+                    const posLabel = (pos !== 'FGI' && pos !== 'Delivery') ? `Position ${pos}` : pos;
+                    workingDaysData.push([product.id, posLabel, data.days, calendarDays]);
+                });
+            });
+            
+            const ws3 = XLSX.utils.aoa_to_sheet(workingDaysData);
+            XLSX.utils.book_append_sheet(wb, ws3, 'Working Days');
+            
+            // Write file
+            XLSX.writeFile(wb, `Manufacturing_Schedule_${formatDate(new Date())}.xlsx`);
+            showToast('Schedule exported to Excel successfully');
+        }
+
+        // Show toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Close context menu on click outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.context-menu') && !e.target.closest('.gantt-day-header')) {
+                closeContextMenu();
+            }
+            if (!e.target.closest('#dayContextMenu')) {
+                closeDayContextMenu();
+            }
+        });
+    </script>
+</body>
+</html>
