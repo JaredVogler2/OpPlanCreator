@@ -1,0 +1,3804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manufacturing Production Scheduler - Integrated V4</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .control-group {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 10px;
+        }
+
+        .control-group label {
+            display: inline-block;
+            width: 180px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .control-group input, .control-group select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 120px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            filter: brightness(1.1);
+        }
+        
+        button:disabled {
+            background: #e5e7eb !important;
+            color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        #undoBtn:hover:not(:disabled), #redoBtn:hover:not(:disabled) {
+            background: #4b5563 !important;
+        }
+
+        .gantt-container {
+            margin: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 70vh;
+            position: relative;
+        }
+
+        .gantt-header {
+            display: flex;
+            position: sticky;
+            top: 0;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            z-index: 100;
+            min-height: 60px;
+            overflow: hidden;
+            width: fit-content;
+            min-width: 100%;
+        }
+
+        .gantt-header-product {
+            width: 150px;
+            min-width: 150px;
+            padding: 10px;
+            font-weight: bold;
+            background: #e9ecef;
+            border-right: 1px solid #dee2e6;
+            position: sticky;
+            left: 0;
+            z-index: 101;
+        }
+
+        .gantt-header-timeline {
+            display: flex;
+            overflow: visible;
+            position: relative;
+            flex: 1;
+            min-width: fit-content;
+        }
+
+        .gantt-day-header {
+            width: 30px;
+            min-width: 30px;
+            max-width: 30px;
+            padding: 5px 2px;
+            text-align: center;
+            border-right: 1px solid #e0e0e0;
+            cursor: pointer;
+            font-size: 11px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .gantt-day-header:hover {
+            background: #e3f2fd;
+        }
+
+        .gantt-day-header.weekend {
+            background: #f5f5f5;
+        }
+
+        .gantt-day-header.holiday {
+            background: #ffebee;
+        }
+
+        .gantt-day-header.vertical-day {
+            background: #fff3e0;
+            text-decoration: line-through;
+        }
+
+        .gantt-body {
+            position: relative;
+            overflow-x: visible;
+        }
+
+        .gantt-row {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            min-height: 40px;
+            position: relative;
+            width: fit-content;
+            min-width: 100%;
+        }
+
+        .gantt-row:hover {
+            background: #fafafa;
+        }
+
+        .gantt-product-label {
+            width: 150px;
+            min-width: 150px;
+            padding: 10px;
+            font-weight: 500;
+            background: white;
+            border-right: 1px solid #dee2e6;
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .gantt-timeline {
+            display: flex;
+            position: relative;
+            flex: 1;
+            flex-shrink: 0;
+        }
+
+        .gantt-day-cell {
+            width: 30px;
+            min-width: 30px;
+            max-width: 30px;
+            height: 40px;
+            border-right: 1px solid #f0f0f0;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .gantt-day-cell.weekend {
+            background: #fafafa;
+        }
+
+        .gantt-day-cell.holiday {
+            background: #fff5f5;
+        }
+
+        .gantt-day-cell.vertical-day {
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 5px,
+                rgba(255,193,7,0.1) 5px,
+                rgba(255,193,7,0.1) 10px
+            );
+        }
+
+        .gantt-bar {
+            position: absolute;
+            height: 30px;
+            top: 5px;
+            border-radius: 4px;
+            color: white;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            padding: 0 5px;
+            transition: transform 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 5;
+        }
+
+        .gantt-bar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 20;
+        }
+        
+        .gantt-bar.extended::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 5px,
+                rgba(0,0,0,0.03) 5px,
+                rgba(0,0,0,0.03) 10px
+            );
+            pointer-events: none;
+            border-radius: 4px;
+        }
+        
+        .gantt-bar-day {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 29px;
+            border-right: 1px solid rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .gantt-bar-day:hover {
+            background: rgba(255,255,255,0.2);
+            border-right: 1px solid rgba(0,0,0,0.2);
+        }
+        
+        .gantt-bar-day:last-child {
+            border-right: none;
+        }
+        
+        .gantt-bar-day[style*="cursor: default"]:hover {
+            background: transparent;
+            cursor: default;
+        }
+        
+        .gantt-bar-day.product-non-working {
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(255,255,255,0.1),
+                rgba(255,255,255,0.1) 3px,
+                rgba(0,0,0,0.2) 3px,
+                rgba(0,0,0,0.2) 6px
+            );
+            opacity: 0.6;
+        }
+        
+        .gantt-bar-day.product-non-working:hover {
+            background: repeating-linear-gradient(
+                -45deg,
+                rgba(255,255,255,0.2),
+                rgba(255,255,255,0.2) 3px,
+                rgba(0,0,0,0.3) 3px,
+                rgba(0,0,0,0.3) 6px
+            );
+        }
+        
+        .gantt-bar-day-number {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 8px;
+            color: rgba(255,255,255,0.4);
+            pointer-events: none;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        /* Position colors for Assembly Line A (darkest) */
+        .gantt-bar.line-A.pos-0 { background: #d32f2f; } /* Red */
+        .gantt-bar.line-A.pos-1 { background: #ff6f00; } /* Dark Orange */
+        .gantt-bar.line-A.pos-2 { background: #ffa000; } /* Orange */
+        .gantt-bar.line-A.pos-3 { background: #ffc107; } /* Amber */
+        .gantt-bar.line-A.pos-4 { background: #ffeb3b; color: #333; } /* Yellow */
+        .gantt-bar.line-A.pos-5 { background: #8bc34a; } /* Light Green */
+        .gantt-bar.line-A.pos-6 { background: #4caf50; } /* Green */
+        .gantt-bar.line-A.pos-7 { background: #00bcd4; } /* Cyan */
+        .gantt-bar.line-A.pos-8 { background: #2196f3; } /* Blue */
+        .gantt-bar.line-A.pos-9 { background: #3f51b5; } /* Indigo */
+        .gantt-bar.line-A.pos-FGI { background: #1976d2; } /* Deep Blue */
+        .gantt-bar.line-A.pos-Delivery { background: #7b1fa2; } /* Purple */
+
+        /* Position colors for Assembly Line B (lighter) */
+        .gantt-bar.line-B.pos-0 { background: #ef5350; } /* Red */
+        .gantt-bar.line-B.pos-1 { background: #ff8a65; } /* Dark Orange */
+        .gantt-bar.line-B.pos-2 { background: #ffb74d; } /* Orange */
+        .gantt-bar.line-B.pos-3 { background: #ffd54f; } /* Amber */
+        .gantt-bar.line-B.pos-4 { background: #fff176; color: #333; } /* Yellow */
+        .gantt-bar.line-B.pos-5 { background: #aed581; } /* Light Green */
+        .gantt-bar.line-B.pos-6 { background: #81c784; } /* Green */
+        .gantt-bar.line-B.pos-7 { background: #4dd0e1; } /* Cyan */
+        .gantt-bar.line-B.pos-8 { background: #64b5f6; } /* Blue */
+        .gantt-bar.line-B.pos-9 { background: #7986cb; } /* Indigo */
+        .gantt-bar.line-B.pos-FGI { background: #42a5f5; } /* Deep Blue */
+        .gantt-bar.line-B.pos-Delivery { background: #ab47bc; } /* Purple */
+
+        /* Position colors for Assembly Line C (even lighter) */
+        .gantt-bar.line-C.pos-0 { background: #ffcdd2; } /* Red */
+        .gantt-bar.line-C.pos-1 { background: #ffccbc; } /* Dark Orange */
+        .gantt-bar.line-C.pos-2 { background: #ffe0b2; } /* Orange */
+        .gantt-bar.line-C.pos-3 { background: #ffecb3; } /* Amber */
+        .gantt-bar.line-C.pos-4 { background: #fff9c4; color: #333; } /* Yellow */
+        .gantt-bar.line-C.pos-5 { background: #dcedc8; } /* Light Green */
+        .gantt-bar.line-C.pos-6 { background: #c8e6c9; } /* Green */
+        .gantt-bar.line-C.pos-7 { background: #b2ebf2; } /* Cyan */
+        .gantt-bar.line-C.pos-8 { background: #bbdefb; } /* Blue */
+        .gantt-bar.line-C.pos-9 { background: #c5cae9; } /* Indigo */
+        .gantt-bar.line-C.pos-FGI { background: #90caf9; } /* Deep Blue */
+        .gantt-bar.line-C.pos-Delivery { background: #ce93d8; } /* Purple */
+
+        /* Position colors for Assembly Line D (lightest) */
+        .gantt-bar.line-D.pos-0 { background: #ffebee; } /* Red */
+        .gantt-bar.line-D.pos-1 { background: #fff3e0; } /* Dark Orange */
+        .gantt-bar.line-D.pos-2 { background: #fff8e1; } /* Orange */
+        .gantt-bar.line-D.pos-3 { background: #fffde7; color: #333; } /* Amber */
+        .gantt-bar.line-D.pos-4 { background: #fffff8; color: #333; } /* Yellow */
+        .gantt-bar.line-D.pos-5 { background: #f1f8e9; } /* Light Green */
+        .gantt-bar.line-D.pos-6 { background: #e8f5e9; } /* Green */
+        .gantt-bar.line-D.pos-7 { background: #e0f7fa; } /* Cyan */
+        .gantt-bar.line-D.pos-8 { background: #e3f2fd; } /* Blue */
+        .gantt-bar.line-D.pos-9 { background: #e8eaf6; } /* Indigo */
+        .gantt-bar.line-D.pos-FGI { background: #bbdefb; } /* Deep Blue */
+        .gantt-bar.line-D.pos-Delivery { background: #e1bee7; } /* Purple */
+
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+            min-width: 200px;
+        }
+
+        .context-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+            position: relative;
+        }
+
+        .context-menu-item:hover {
+            background: #f0f0f0;
+        }
+
+        .submenu-parent {
+            position: relative;
+        }
+
+        .submenu {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            display: none;
+            min-width: 100px;
+            margin-left: 5px;
+        }
+
+        .submenu-parent:hover .submenu {
+            display: block;
+        }
+
+        .legend {
+            background: white;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .legend-item {
+            display: inline-block;
+            margin: 5px 15px 5px 0;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 3px;
+            vertical-align: middle;
+        }
+
+        .stats {
+            background: white;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .stat-item {
+            display: inline-block;
+            margin-right: 30px;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .stat-value {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal h3 {
+            margin-bottom: 15px;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 3000;
+        }
+
+        .toast.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .tooltip {
+            position: fixed;
+            background: linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(30,30,30,0.95) 100%);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 2000;
+            white-space: nowrap;
+            visibility: hidden;
+            opacity: 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: opacity 0.15s ease-in-out, visibility 0.15s;
+            min-width: 180px;
+        }
+
+        .tooltip.show {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .tooltip-row {
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tooltip-label {
+            font-weight: 600;
+            color: #9ca3af;
+            display: inline-block;
+            margin-right: 10px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tooltip-value {
+            color: white;
+            font-weight: 400;
+            font-size: 11px;
+        }
+        
+        .fix-notice {
+            background: #10b981;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .fix-notice.v2 {
+            background: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Manufacturing Production Scheduler</h1>
+        <p>Interactive Gantt Chart with Control Station Builder & Fixed Cascade Logic</p>
+        <p style="font-size: 12px; opacity: 0.8; margin-top: 5px;">
+            <strong>Right-click any day</strong> to toggle between working/non-working | 
+            Right-click header dates for global non-working days | 
+            Ctrl+Z to undo
+        </p>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Days per Position:</label>
+            <input type="number" id="daysPerPosition" value="5" min="1">
+        </div>
+        <div class="control-group">
+            <label>Days FGI to Delivery:</label>
+            <input type="number" id="daysFGItoDelivery" value="3" min="1">
+        </div>
+        <div class="control-group">
+            <label>Number of Lines:</label>
+            <select id="numLines">
+                <option value="2" selected>2 (A, B)</option>
+                <option value="3">3 (A, B, C)</option>
+                <option value="4">4 (A, B, C, D)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Number of Positions:</label>
+            <input type="number" id="numPositions" value="4" min="1" max="10">
+        </div>
+        <div class="control-group">
+            <label>Number of Products to Display:</label>
+            <input type="number" id="productsPerLine" value="10" min="1">
+        </div>
+        <div style="display: block; width: 100%; margin-top: 15px;">
+            <h4 style="margin-bottom: 10px; font-weight: 600; color: #333;">Assembly Line Start Dates:</h4>
+            <div class="control-group" id="lineAStart" style="display: inline-block;">
+                <label>Line A Start Date:</label>
+                <input type="date" id="startDateA" value="2025-09-17">
+            </div>
+            <div class="control-group" id="lineBStart" style="display: inline-block;">
+                <label>Line B Start Date:</label>
+                <input type="date" id="startDateB" value="2025-09-19">
+            </div>
+            <div class="control-group" id="lineCStart" style="display: inline-block;">
+                <label>Line C Start Date:</label>
+                <input type="date" id="startDateC" value="2025-09-23">
+            </div>
+            <div class="control-group" id="lineDStart" style="display: inline-block;">
+                <label>Line D Start Date:</label>
+                <input type="date" id="startDateD" value="2025-09-25">
+            </div>
+        </div>
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+            <button onclick="generateSchedule()" style="background: #10b981;">🔄 Generate Schedule</button>
+            <button onclick="saveSchedule()" style="background: #3b82f6;">💾 Save Schedule</button>
+            <button onclick="loadSchedule()" style="background: #3b82f6;">📂 Load Schedule</button>
+            <button onclick="exportToExcel()" style="background: #f59e0b;">📊 Export to Excel</button>
+            <button onclick="undoAction()" id="undoBtn" style="background: #6b7280; margin-left: 20px;" disabled>↶ Undo</button>
+            <button onclick="redoAction()" id="redoBtn" style="background: #6b7280;" disabled>↷ Redo</button>
+        </div>
+    </div>
+
+    <div class="stats" id="stats">
+        <div class="stat-item">
+            <span class="stat-label">Total Products:</span>
+            <span class="stat-value" id="totalProducts">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Schedule Duration:</span>
+            <span class="stat-value" id="scheduleDuration">0 days</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Non-Working Days:</span>
+            <span class="stat-value" id="nonWorkingDays">0</span>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-title">Position Colors (Line A - Darkest):</div>
+        <div id="legendContent"></div>
+    </div>
+
+    <div class="gantt-container" id="ganttContainer">
+        <div class="gantt-header">
+            <div class="gantt-header-product">Product / Line</div>
+            <div class="gantt-header-timeline" id="ganttHeaderTimeline"></div>
+        </div>
+        <div class="gantt-body" id="ganttBody"></div>
+    </div>
+
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="addVerticalDay()">Add Vertical Day (All Lines)</div>
+        <div class="context-menu-item submenu-parent" onmouseover="showLineSubmenu(event)">
+            Add Non-Working Day (Line) ▶
+            <div class="submenu" id="lineSubmenu">
+                <div class="context-menu-item" onclick="addLineNonWorkingDay('A')">Line A</div>
+                <div class="context-menu-item" onclick="addLineNonWorkingDay('B')">Line B</div>
+                <div class="context-menu-item" onclick="addLineNonWorkingDay('C')">Line C</div>
+                <div class="context-menu-item" onclick="addLineNonWorkingDay('D')">Line D</div>
+            </div>
+        </div>
+        <div class="context-menu-item" onclick="removeNonWorkingDay()">Remove Non-Working Day</div>
+        <div class="context-menu-item" onclick="closeContextMenu()">Cancel</div>
+    </div>
+    
+    <div class="context-menu" id="dayContextMenu">
+        <div class="context-menu-item" id="toggleDayItem" onclick="toggleProductDay()">Make Non-Working Day</div>
+        <div class="context-menu-item" onclick="closeDayContextMenu()">Cancel</div>
+    </div>
+
+    <div id="saveModal" class="modal">
+        <div class="modal-content">
+            <h3>Save Schedule</h3>
+            <input type="text" id="saveName" placeholder="Enter schedule name">
+            <button onclick="confirmSave()">Save</button>
+            <button onclick="closeSaveModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div id="loadModal" class="modal">
+        <div class="modal-content">
+            <h3>Load Schedule</h3>
+            <select id="loadSelect" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+            <button onclick="confirmLoad()">Load</button>
+            <button onclick="closeLoadModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Global variables
+        let schedule = [];
+        let holidays = [
+            // Boeing Holiday Calendar
+            // 2025 Holidays
+            '2025-01-01', '2025-05-26', '2025-07-04', '2025-09-01', '2025-11-27',
+            '2025-11-28', '2025-12-24', '2025-12-25', '2025-12-26', '2025-12-29',
+            '2025-12-30', '2025-12-31',
+            // 2026 Holidays
+            '2026-01-01', '2026-05-25', '2026-07-03', '2026-09-07', '2026-11-26',
+            '2026-11-27', '2026-12-24', '2026-12-25', '2026-12-28', '2026-12-29',
+            '2026-12-30', '2026-12-31'
+        ];
+        let verticalDays = [];
+        let lineSpecificNonWorkingDays = {};
+        let horizontalDays = {}; // Product-specific delays
+        let startDate;
+        let endDate;
+        let currentContextDate = null;
+
+        // Control Station variables
+        let controlStations = [];
+        let controlStationIdCounter = 1;
+        
+        // Variables for day context menu
+        let currentDayContextProduct = null;
+        let currentDayContextDate = null;
+        let currentDayContextPosition = null;
+
+        // Undo/Redo system
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_UNDO_STACK = 50;
+
+        // Save current state for undo
+        function saveStateForUndo(actionDescription) {
+            const state = {
+                description: actionDescription,
+                schedule: JSON.parse(JSON.stringify(schedule)),
+                verticalDays: [...verticalDays],
+                lineSpecificNonWorkingDays: JSON.parse(JSON.stringify(lineSpecificNonWorkingDays)),
+                horizontalDays: JSON.parse(JSON.stringify(horizontalDays)),
+                settings: {
+                    daysPerPosition: document.getElementById('daysPerPosition').value,
+                    daysFGItoDelivery: document.getElementById('daysFGItoDelivery').value,
+                    numLines: document.getElementById('numLines').value,
+                    numPositions: document.getElementById('numPositions').value,
+                    productsPerLine: document.getElementById('productsPerLine').value,
+                    startDateA: document.getElementById('startDateA').value,
+                    startDateB: document.getElementById('startDateB').value,
+                    startDateC: document.getElementById('startDateC').value,
+                    startDateD: document.getElementById('startDateD').value
+                },
+                timestamp: new Date().toISOString()
+            };
+            
+            undoStack.push(state);
+            
+            if (undoStack.length > MAX_UNDO_STACK) {
+                undoStack.shift();
+            }
+            
+            redoStack = [];
+            updateUndoRedoButtons();
+        }
+
+        // Restore a saved state
+        function restoreState(state) {
+            schedule = state.schedule.map(product => ({
+                ...product,
+                positions: Object.fromEntries(
+                    Object.entries(product.positions).map(([pos, data]) => {
+                        let startDate, endDate;
+                        
+                        if (typeof data.start === 'string') {
+                            const startMatch = data.start.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (startMatch) {
+                                startDate = new Date(parseInt(startMatch[1]), parseInt(startMatch[2]) - 1, parseInt(startMatch[3]));
+                            } else {
+                                startDate = new Date(data.start);
+                            }
+                        } else {
+                            startDate = new Date(data.start);
+                        }
+                        
+                        if (typeof data.end === 'string') {
+                            const endMatch = data.end.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (endMatch) {
+                                endDate = new Date(parseInt(endMatch[1]), parseInt(endMatch[2]) - 1, parseInt(endMatch[3]));
+                            } else {
+                                endDate = new Date(data.end);
+                            }
+                        } else {
+                            endDate = new Date(data.end);
+                        }
+                        
+                        return [
+                            pos,
+                            {
+                                ...data,
+                                start: startDate,
+                                end: endDate
+                            }
+                        ];
+                    })
+                )
+            }));
+            
+            verticalDays = [...state.verticalDays];
+            lineSpecificNonWorkingDays = JSON.parse(JSON.stringify(state.lineSpecificNonWorkingDays));
+            horizontalDays = JSON.parse(JSON.stringify(state.horizontalDays));
+            
+            document.getElementById('daysPerPosition').value = state.settings.daysPerPosition;
+            document.getElementById('daysFGItoDelivery').value = state.settings.daysFGItoDelivery;
+            document.getElementById('numLines').value = state.settings.numLines;
+            document.getElementById('numPositions').value = state.settings.numPositions;
+            document.getElementById('productsPerLine').value = state.settings.productsPerLine;
+            document.getElementById('startDateA').value = state.settings.startDateA;
+            document.getElementById('startDateB').value = state.settings.startDateB;
+            document.getElementById('startDateC').value = state.settings.startDateC;
+            document.getElementById('startDateD').value = state.settings.startDateD;
+            
+            updateLineStartDates();
+            renderGantt();
+            updateStats();
+        }
+
+        function undoAction() {
+            if (undoStack.length === 0) return;
+            
+            const currentState = {
+                description: "Before undo",
+                schedule: JSON.parse(JSON.stringify(schedule)),
+                verticalDays: [...verticalDays],
+                lineSpecificNonWorkingDays: JSON.parse(JSON.stringify(lineSpecificNonWorkingDays)),
+                horizontalDays: JSON.parse(JSON.stringify(horizontalDays)),
+                settings: {
+                    daysPerPosition: document.getElementById('daysPerPosition').value,
+                    daysFGItoDelivery: document.getElementById('daysFGItoDelivery').value,
+                    numLines: document.getElementById('numLines').value,
+                    numPositions: document.getElementById('numPositions').value,
+                    productsPerLine: document.getElementById('productsPerLine').value,
+                    startDateA: document.getElementById('startDateA').value,
+                    startDateB: document.getElementById('startDateB').value,
+                    startDateC: document.getElementById('startDateC').value,
+                    startDateD: document.getElementById('startDateD').value
+                },
+                timestamp: new Date().toISOString()
+            };
+            redoStack.push(currentState);
+            
+            const previousState = undoStack.pop();
+            restoreState(previousState);
+            
+            updateUndoRedoButtons();
+            showToast(`Undone: ${previousState.description}`);
+        }
+
+        function redoAction() {
+            if (redoStack.length === 0) return;
+            
+            const currentState = {
+                description: "Before redo",
+                schedule: JSON.parse(JSON.stringify(schedule)),
+                verticalDays: [...verticalDays],
+                lineSpecificNonWorkingDays: JSON.parse(JSON.stringify(lineSpecificNonWorkingDays)),
+                horizontalDays: JSON.parse(JSON.stringify(horizontalDays)),
+                settings: {
+                    daysPerPosition: document.getElementById('daysPerPosition').value,
+                    daysFGItoDelivery: document.getElementById('daysFGItoDelivery').value,
+                    numLines: document.getElementById('numLines').value,
+                    numPositions: document.getElementById('numPositions').value,
+                    productsPerLine: document.getElementById('productsPerLine').value,
+                    startDateA: document.getElementById('startDateA').value,
+                    startDateB: document.getElementById('startDateB').value,
+                    startDateC: document.getElementById('startDateC').value,
+                    startDateD: document.getElementById('startDateD').value
+                },
+                timestamp: new Date().toISOString()
+            };
+            undoStack.push(currentState);
+            
+            const nextState = redoStack.pop();
+            restoreState(nextState);
+            
+            updateUndoRedoButtons();
+            showToast(`Redone action`);
+        }
+
+        function updateUndoRedoButtons() {
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            
+            if (undoBtn) {
+                undoBtn.disabled = undoStack.length === 0;
+                if (undoStack.length > 0) {
+                    const lastAction = undoStack[undoStack.length - 1];
+                    undoBtn.title = `Undo: ${lastAction.description}`;
+                } else {
+                    undoBtn.title = 'Nothing to undo';
+                }
+            }
+            
+            if (redoBtn) {
+                redoBtn.disabled = redoStack.length === 0;
+                redoBtn.title = redoStack.length > 0 ? 'Redo last undone action' : 'Nothing to redo';
+            }
+        }
+
+        window.onload = function() {
+            document.getElementById('numLines').addEventListener('change', function() {
+                updateLineStartDates();
+                generateSchedule();
+            });
+            
+            document.getElementById('numPositions').addEventListener('change', function() {
+                generateSchedule();
+            });
+            
+            updateLineStartDates();
+            generateSchedule();
+            
+            document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    undoAction();
+                }
+                else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                    e.preventDefault();
+                    redoAction();
+                }
+            });
+        
+            // Initialize Control Station
+            updateControlStationPositions();
+            updateMDayReference();
+};
+
+        function updateLineStartDates() {
+            const numLines = parseInt(document.getElementById('numLines').value);
+            
+            const lineAStart = document.getElementById('lineAStart');
+            const lineBStart = document.getElementById('lineBStart');
+            const lineCStart = document.getElementById('lineCStart');
+            const lineDStart = document.getElementById('lineDStart');
+            
+            if (lineAStart) lineAStart.style.display = 'inline-block';
+            if (lineBStart) lineBStart.style.display = 'inline-block';
+            
+            if (lineCStart) {
+                lineCStart.style.display = numLines >= 3 ? 'inline-block' : 'none';
+            }
+            
+            if (lineDStart) {
+                lineDStart.style.display = numLines >= 4 ? 'inline-block' : 'none';
+            }
+        }
+
+        function isWeekend(date) {
+            const day = date.getDay();
+            return day === 0 || day === 6;
+        }
+
+        function isHoliday(date) {
+            const dateStr = formatDate(date);
+            return holidays.includes(dateStr);
+        }
+
+        function isVerticalDay(date) {
+            const dateStr = formatDate(date);
+            return verticalDays.includes(dateStr);
+        }
+
+        function isLineNonWorkingDay(date, line) {
+            const dateStr = formatDate(date);
+            return lineSpecificNonWorkingDays[line] && lineSpecificNonWorkingDays[line].includes(dateStr);
+        }
+
+        function isHorizontalDay(date, productId) {
+            const dateStr = formatDate(date);
+            return horizontalDays[productId] && horizontalDays[productId].includes(dateStr);
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function addWorkingDays(startDate, days, line, productId) {
+            let date = new Date(startDate);
+            date.setHours(0, 0, 0, 0);
+            let workingDaysAdded = 0;
+            
+            if (days <= 0) return date;
+            
+            while (workingDaysAdded < days) {
+                date.setDate(date.getDate() + 1);
+                const dateStr = formatDate(date);
+                
+                if (!isWeekend(date) && !isHoliday(date) && !isVerticalDay(date) && 
+                    !isLineNonWorkingDay(date, line) && !isHorizontalDay(date, productId)) {
+                    workingDaysAdded++;
+                }
+            }
+            
+            return date;
+        }
+
+        function generateSchedule() {
+            const daysPerPosition = parseInt(document.getElementById('daysPerPosition').value);
+            const daysFGItoDelivery = parseInt(document.getElementById('daysFGItoDelivery').value);
+            const numLines = parseInt(document.getElementById('numLines').value);
+            const numPositions = parseInt(document.getElementById('numPositions').value);
+            const productsPerLine = parseInt(document.getElementById('productsPerLine').value);
+            
+            schedule = [];
+            const lines = ['A', 'B', 'C', 'D'].slice(0, numLines);
+            
+            let earliestDate = null;
+            
+            const positions = [];
+            for (let i = 0; i < numPositions; i++) {
+                positions.push(i.toString());
+            }
+            positions.push('FGI', 'Delivery');
+            
+            updateLegend(positions);
+            
+            const lineCurrentDates = {};
+            
+            lines.forEach(line => {
+                let currentDate;
+                if (line === 'A') {
+                    const dateStr = document.getElementById('startDateA').value;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    currentDate = new Date(year, month - 1, day);
+                } else if (line === 'B') {
+                    const dateStr = document.getElementById('startDateB').value;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    currentDate = new Date(year, month - 1, day);
+                } else if (line === 'C') {
+                    const dateStr = document.getElementById('startDateC').value;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    currentDate = new Date(year, month - 1, day);
+                } else if (line === 'D') {
+                    const dateStr = document.getElementById('startDateD').value;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    currentDate = new Date(year, month - 1, day);
+                }
+                
+                currentDate.setHours(0, 0, 0, 0);
+                lineCurrentDates[line] = currentDate;
+                
+                if (!earliestDate || currentDate < earliestDate) {
+                    earliestDate = new Date(currentDate);
+                }
+            });
+            
+            let productId = 1000;
+            const totalProducts = productsPerLine * numLines;
+            
+            for (let round = 0; round < productsPerLine; round++) {
+                for (let lineIndex = 0; lineIndex < numLines; lineIndex++) {
+                    const line = lines[lineIndex];
+                    
+                    const product = {
+                        id: productId++,
+                        line: line,
+                        positions: {}
+                    };
+                    
+                    let positionStart = new Date(lineCurrentDates[line]);
+                    positionStart.setHours(0, 0, 0, 0);
+                    
+                    positions.forEach((pos, posIndex) => {
+                        const daysInPosition = (pos === 'Delivery') ? daysFGItoDelivery : daysPerPosition;
+                        const positionEnd = addWorkingDays(positionStart, daysInPosition - 1, line, product.id);
+                        
+                        product.positions[pos] = {
+                            start: new Date(positionStart),
+                            end: new Date(positionEnd),
+                            days: daysInPosition
+                        };
+                        
+                        positionStart = addWorkingDays(positionEnd, 1, line, product.id);
+                    });
+                    
+                    schedule.push(product);
+                    
+                    lineCurrentDates[line] = addWorkingDays(product.positions['0'].end, 1, line, product.id);
+                }
+            }
+            
+            schedule.sort((a, b) => a.id - b.id);
+            
+            startDate = earliestDate || new Date();
+            
+            renderGantt();
+            updateStats();
+            updateMDayReference();
+            
+            // Update control station dropdown and recalculate if any exist
+            updateControlStationPositions();
+            if (controlStations.length > 0) {
+                recalculateControlStations();
+            }
+        }
+
+        function generatePositionColors(numPositions) {
+            const colors = {};
+            
+            const totalItems = numPositions + 2;
+            
+            const rainbowColors = [
+                { r: 244, g: 67, b: 54 },   // Red
+                { r: 255, g: 152, b: 0 },   // Orange  
+                { r: 255, g: 235, b: 59 },  // Yellow
+                { r: 139, g: 195, b: 74 },  // Green
+                { r: 33, g: 150, b: 243 },   // Blue
+                { r: 103, g: 58, b: 183 }   // Purple
+            ];
+            
+            for (let i = 0; i < numPositions; i++) {
+                const progress = i / (totalItems - 1);
+                const segmentLength = 1 / (rainbowColors.length - 1);
+                const segmentIndex = Math.floor(progress / segmentLength);
+                const segmentProgress = (progress % segmentLength) / segmentLength;
+                
+                const startColor = rainbowColors[Math.min(segmentIndex, rainbowColors.length - 1)];
+                const endColor = rainbowColors[Math.min(segmentIndex + 1, rainbowColors.length - 1)];
+                
+                const r = Math.round(startColor.r + (endColor.r - startColor.r) * segmentProgress);
+                const g = Math.round(startColor.g + (endColor.g - startColor.g) * segmentProgress);
+                const b = Math.round(startColor.b + (endColor.b - startColor.b) * segmentProgress);
+                
+                colors[i.toString()] = `rgb(${r}, ${g}, ${b})`;
+            }
+            
+            const fgiProgress = numPositions / (totalItems - 1);
+            colors['FGI'] = interpolateColor(rainbowColors, fgiProgress);
+            
+            colors['Delivery'] = `rgb(${rainbowColors[5].r}, ${rainbowColors[5].g}, ${rainbowColors[5].b})`;
+            
+            return colors;
+        }
+        
+        function interpolateColor(colorArray, progress) {
+            const segmentLength = 1 / (colorArray.length - 1);
+            const segmentIndex = Math.floor(progress / segmentLength);
+            const segmentProgress = (progress % segmentLength) / segmentLength;
+            
+            const startColor = colorArray[Math.min(segmentIndex, colorArray.length - 1)];
+            const endColor = colorArray[Math.min(segmentIndex + 1, colorArray.length - 1)];
+            
+            const r = Math.round(startColor.r + (endColor.r - startColor.r) * segmentProgress);
+            const g = Math.round(startColor.g + (endColor.g - startColor.g) * segmentProgress);
+            const b = Math.round(startColor.b + (endColor.b - startColor.b) * segmentProgress);
+            
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        
+        function applyPositionColors(numPositions) {
+            const baseColors = generatePositionColors(numPositions);
+            const styleElement = document.getElementById('dynamicPositionColors') || 
+                                document.createElement('style');
+            styleElement.id = 'dynamicPositionColors';
+            
+            let cssRules = '';
+            
+            const numLines = parseInt(document.getElementById('numLines').value);
+            const lines = ['A', 'B', 'C', 'D'].slice(0, numLines);
+            
+            const shadeFactors = [];
+            for (let i = 0; i < numLines; i++) {
+                if (numLines === 1) {
+                    shadeFactors.push(1);
+                } else if (numLines === 2) {
+                    shadeFactors.push(i === 0 ? 1 : 0.3);
+                } else if (numLines === 3) {
+                    shadeFactors.push([1, 0.55, 0.25][i]);
+                } else if (numLines === 4) {
+                    shadeFactors.push([1, 0.65, 0.4, 0.2][i]);
+                }
+            }
+            
+            lines.forEach((line, lineIndex) => {
+                const shadeFactor = shadeFactors[lineIndex];
+                
+                Object.entries(baseColors).forEach(([position, color]) => {
+                    const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+                    if (match) {
+                        let r = parseInt(match[1]);
+                        let g = parseInt(match[2]);
+                        let b = parseInt(match[3]);
+                        
+                        if (lineIndex > 0) {
+                            r = Math.round(r * shadeFactor + 255 * (1 - shadeFactor));
+                            g = Math.round(g * shadeFactor + 255 * (1 - shadeFactor));
+                            b = Math.round(b * shadeFactor + 255 * (1 - shadeFactor));
+                        }
+                        
+                        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                        const textColor = brightness > 155 ? '#333' : 'white';
+                        
+                        cssRules += `.gantt-bar.line-${line}.pos-${position} { 
+                            background: rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}); 
+                            color: ${textColor};
+                        }\n`;
+                    }
+                });
+            });
+            
+            styleElement.textContent = cssRules;
+            if (!document.getElementById('dynamicPositionColors')) {
+                document.head.appendChild(styleElement);
+            }
+        }
+
+        function updateLegend(positions) {
+            const legendContent = document.getElementById('legendContent');
+            legendContent.innerHTML = '';
+            
+            const numPositions = positions.filter(p => p !== 'FGI' && p !== 'Delivery').length;
+            const colors = generatePositionColors(numPositions);
+            const numLines = parseInt(document.getElementById('numLines').value);
+            
+            const legendTitle = document.querySelector('.legend-title');
+            if (numLines === 2) {
+                legendTitle.textContent = 'Position Colors (Line A Dark / Line B Light):';
+            } else if (numLines === 3) {
+                legendTitle.textContent = 'Position Colors (Lines A→C Dark to Light):';
+            } else if (numLines === 4) {
+                legendTitle.textContent = 'Position Colors (Lines A→D Dark to Light):';
+            } else {
+                legendTitle.textContent = 'Position Colors:';
+            }
+            
+            positions.forEach(pos => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                const color = colors[pos] || '#999';
+                
+                let labelText = pos;
+                if (pos !== 'FGI' && pos !== 'Delivery') {
+                    labelText = `Position ${pos}`;
+                }
+                
+                item.innerHTML = `<span class="legend-color" style="background: ${color};"></span>${labelText}`;
+                legendContent.appendChild(item);
+            });
+            
+            applyPositionColors(numPositions);
+        }
+
+        function renderGantt() {
+            if (schedule.length === 0) return;
+            
+            startDate = new Date(schedule[0].positions['0'].start);
+            startDate.setHours(0, 0, 0, 0);
+            
+            endDate = new Date(startDate);
+            
+            schedule.forEach(product => {
+                const deliveryEnd = new Date(product.positions['Delivery'].end);
+                if (deliveryEnd > endDate) {
+                    endDate = new Date(deliveryEnd);
+                }
+            });
+            
+            endDate.setDate(endDate.getDate() + 30);
+            
+            const headerTimeline = document.getElementById('ganttHeaderTimeline');
+            headerTimeline.innerHTML = '';
+            
+            let currentDate = new Date(startDate);
+            currentDate.setHours(0, 0, 0, 0);
+            let dayIndex = 0;
+            
+            while (currentDate <= endDate) {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'gantt-day-header';
+                dayHeader.dataset.date = formatDate(currentDate);
+                dayHeader.dataset.index = dayIndex;
+                
+                const month = currentDate.getMonth() + 1;
+                const day = currentDate.getDate();
+                dayHeader.innerHTML = `${month}/${day}<br>${currentDate.toLocaleDateString('en-US', {weekday: 'short'}).substring(0,2)}`;
+                
+                if (isWeekend(currentDate)) {
+                    dayHeader.classList.add('weekend');
+                }
+                if (isHoliday(currentDate)) {
+                    dayHeader.classList.add('holiday');
+                }
+                if (isVerticalDay(currentDate)) {
+                    dayHeader.classList.add('vertical-day');
+                }
+                
+                dayHeader.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    showContextMenu(e, this.dataset.date);
+                });
+                
+                headerTimeline.appendChild(dayHeader);
+                
+                currentDate.setDate(currentDate.getDate() + 1);
+                dayIndex++;
+            }
+            
+            const ganttBody = document.getElementById('ganttBody');
+            ganttBody.innerHTML = '';
+            
+            schedule.forEach((product, productIndex) => {
+                const row = document.createElement('div');
+                row.className = 'gantt-row';
+                row.dataset.productId = product.id;
+                
+                const label = document.createElement('div');
+                label.className = 'gantt-product-label';
+                label.textContent = `Product ${product.id} - Line ${product.line}`;
+                row.appendChild(label);
+                
+                const timeline = document.createElement('div');
+                timeline.className = 'gantt-timeline';
+                
+                currentDate = new Date(startDate);
+                currentDate.setHours(0, 0, 0, 0);
+                dayIndex = 0;
+                
+                while (currentDate <= endDate) {
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'gantt-day-cell';
+                    dayCell.dataset.date = formatDate(currentDate);
+                    dayCell.dataset.index = dayIndex;
+                    
+                    if (isWeekend(currentDate)) {
+                        dayCell.classList.add('weekend');
+                    }
+                    if (isHoliday(currentDate)) {
+                        dayCell.classList.add('holiday');
+                    }
+                    if (isVerticalDay(currentDate)) {
+                        dayCell.classList.add('vertical-day');
+                    }
+                    if (isLineNonWorkingDay(currentDate, product.line)) {
+                        dayCell.classList.add('vertical-day');
+                    }
+                    
+                    timeline.appendChild(dayCell);
+                    
+                    currentDate.setDate(currentDate.getDate() + 1);
+                    dayIndex++;
+                }
+                
+                row.appendChild(timeline);
+                
+                Object.entries(product.positions).forEach(([posName, posData]) => {
+                    const bar = createGanttBar(product, posName, posData);
+                    timeline.appendChild(bar);
+                });
+                
+                ganttBody.appendChild(row);
+            });
+        }
+        
+        function createGanttBar(product, positionName, positionData) {
+            const bar = document.createElement('div');
+            bar.className = `gantt-bar line-${product.line} pos-${positionName}`;
+            bar.style.position = 'absolute';
+            bar.style.zIndex = '5';
+            
+            let barLabel = positionName;
+            if (positionName !== 'FGI' && positionName !== 'Delivery') {
+                barLabel = `Pos ${positionName}`;
+            }
+            
+            bar.dataset.productId = product.id;
+            bar.dataset.position = positionName;
+            bar.dataset.line = product.line;
+            bar.dataset.startDate = formatDate(positionData.start);
+            bar.dataset.endDate = formatDate(positionData.end);
+            
+            const msPerDay = 1000 * 60 * 60 * 24;
+            
+            const barStart = new Date(positionData.start);
+            barStart.setHours(0, 0, 0, 0);
+            let barEnd = new Date(positionData.end);
+            barEnd.setHours(0, 0, 0, 0);
+            let actualEnd = new Date(positionData.end);
+            actualEnd.setHours(0, 0, 0, 0);
+            
+            const positionOrder = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'FGI', 'Delivery'];
+            const currentPosIndex = positionOrder.indexOf(positionName);
+            let isExtended = false;
+            if (currentPosIndex < positionOrder.length - 1) {
+                let nextPos = null;
+                for (let i = currentPosIndex + 1; i < positionOrder.length; i++) {
+                    if (product.positions[positionOrder[i]]) {
+                        nextPos = positionOrder[i];
+                        break;
+                    }
+                }
+                
+                if (nextPos) {
+                    const nextStart = new Date(product.positions[nextPos].start);
+                    nextStart.setHours(0, 0, 0, 0);
+                    
+                    const dayAfterEnd = new Date(barEnd);
+                    dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+                    
+                    if (dayAfterEnd < nextStart) {
+                        barEnd = new Date(nextStart);
+                        barEnd.setDate(barEnd.getDate() - 1);
+                        isExtended = true;
+                        bar.classList.add('extended');
+                    }
+                }
+            }
+            
+            const chartStart = new Date(startDate);
+            chartStart.setHours(0, 0, 0, 0);
+            
+            const startDiff = barStart - chartStart;
+            const startDays = Math.floor(startDiff / msPerDay);
+            const endDiff = barEnd - barStart;
+            const duration = Math.floor(endDiff / msPerDay) + 1;
+            
+            bar.style.left = `${startDays * 30}px`;
+            bar.style.width = `${duration * 30 - 4}px`;
+            
+            let currentDate = new Date(barStart);
+            let dayIndex = 0;
+            let workingDayNumber = 1;
+            
+            while (currentDate <= barEnd) {
+                const dateStr = formatDate(currentDate);
+                const isProductNonWorking = horizontalDays[product.id] && horizontalDays[product.id].includes(dateStr);
+                const isWorkingDay = !isWeekend(currentDate) && !isHoliday(currentDate) && 
+                    !isVerticalDay(currentDate) && !isLineNonWorkingDay(currentDate, product.line) && 
+                    !isProductNonWorking;
+                
+                const daySegment = document.createElement('div');
+                daySegment.className = 'gantt-bar-day';
+                if (isProductNonWorking && currentDate <= actualEnd) {
+                    daySegment.classList.add('product-non-working');
+                }
+                daySegment.style.left = `${dayIndex * 30}px`;
+                daySegment.dataset.productId = product.id;
+                daySegment.dataset.position = positionName;
+                daySegment.dataset.date = dateStr;
+                
+                if (isWorkingDay && currentDate <= actualEnd) {
+                    daySegment.dataset.dayNumber = workingDayNumber;
+                    daySegment.title = `Day ${workingDayNumber} - Right-click to toggle`;
+                    
+                    const dayLabel = document.createElement('span');
+                    dayLabel.className = 'gantt-bar-day-number';
+                    dayLabel.textContent = workingDayNumber;
+                    daySegment.appendChild(dayLabel);
+                    
+                    daySegment.style.cursor = 'pointer';
+                    
+                    daySegment.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showDayContextMenu(e, product.id, dateStr, positionName);
+                    });
+                    
+                    workingDayNumber++;
+                } else {
+                    daySegment.style.cursor = 'default';
+                    daySegment.style.opacity = '0.5';
+                    
+                    if (currentDate > actualEnd) {
+                        daySegment.title = 'Extended through gap';
+                    } else if (isProductNonWorking) {
+                        daySegment.title = 'Product-specific non-working day - right-click to toggle';
+                    } else {
+                        daySegment.title = 'Non-working day - right-click to toggle';
+                    }
+                    
+                    if (currentDate <= actualEnd) {
+                        daySegment.style.cursor = 'pointer';
+                        
+                        daySegment.addEventListener('contextmenu', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            showDayContextMenu(e, product.id, dateStr, positionName);
+                        });
+                    }
+                }
+                
+                bar.appendChild(daySegment);
+                currentDate.setDate(currentDate.getDate() + 1);
+                dayIndex++;
+            }
+            
+            const labelOverlay = document.createElement('div');
+            labelOverlay.style.position = 'absolute';
+            labelOverlay.style.top = '0';
+            labelOverlay.style.left = '0';
+            labelOverlay.style.padding = '0 5px';
+            labelOverlay.style.height = '100%';
+            labelOverlay.style.display = 'flex';
+            labelOverlay.style.alignItems = 'center';
+            labelOverlay.style.pointerEvents = 'none';
+            labelOverlay.style.fontSize = '11px';
+            labelOverlay.style.fontWeight = '600';
+            labelOverlay.style.textShadow = '0 1px 2px rgba(0,0,0,0.3)';
+            labelOverlay.style.zIndex = '10';
+            labelOverlay.textContent = barLabel;
+            bar.appendChild(labelOverlay);
+            
+            bar.addEventListener('mouseenter', handleBarMouseEnter);
+            bar.addEventListener('mousemove', handleBarMouseMove);
+            bar.addEventListener('mouseleave', handleBarMouseLeave);
+            
+            return bar;
+        }
+        
+        let tooltipTimeout = null;
+        
+        function handleBarMouseEnter(e) {
+            if (tooltipTimeout) {
+                clearTimeout(tooltipTimeout);
+                tooltipTimeout = null;
+            }
+            
+            let bar = e.currentTarget;
+            if (!bar.dataset.productId) {
+                bar = bar.closest('.gantt-bar');
+            }
+            if (!bar) return;
+            
+            const tooltip = document.getElementById('tooltip');
+            
+            const product = schedule.find(p => p.id === parseInt(bar.dataset.productId));
+            const position = bar.dataset.position;
+            const workingDays = product.positions[position].days;
+            
+            let positionDisplay = position;
+            if (position !== 'FGI' && position !== 'Delivery') {
+                positionDisplay = `Position ${position}`;
+            }
+            
+            const startDateParts = bar.dataset.startDate.split('-').map(Number);
+            const startDate = new Date(startDateParts[0], startDateParts[1] - 1, startDateParts[2]);
+            const endDateParts = bar.dataset.endDate.split('-').map(Number);
+            const endDate = new Date(endDateParts[0], endDateParts[1] - 1, endDateParts[2]);
+            
+            const shortFormat = { month: '2-digit', day: '2-digit', year: 'numeric' };
+            const startShort = startDate.toLocaleDateString('en-US', shortFormat);
+            const endShort = endDate.toLocaleDateString('en-US', shortFormat);
+            
+            const calendarDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+            
+            const tooltipHTML = `
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Product:</span>
+                    <span class="tooltip-value">${bar.dataset.productId}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Line:</span>
+                    <span class="tooltip-value">${bar.dataset.line}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Position:</span>
+                    <span class="tooltip-value">${positionDisplay}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Start:</span>
+                    <span class="tooltip-value">${startShort}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">End:</span>
+                    <span class="tooltip-value">${endShort}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Duration:</span>
+                    <span class="tooltip-value">${workingDays} working / ${calendarDays} calendar days</span>
+                </div>
+                ${bar.classList.contains('extended') ? `
+                <div class="tooltip-row" style="font-size: 10px; color: #aaa; margin-top: 4px;">
+                    <span style="font-style: italic;">* Bar extended through weekend/holiday</span>
+                </div>` : ''}
+            `;
+            
+            tooltip.innerHTML = tooltipHTML;
+            tooltip.classList.add('show');
+            
+            handleBarMouseMove(e);
+        }
+
+        function handleBarMouseMove(e) {
+            const tooltip = document.getElementById('tooltip');
+            
+            let x = e.clientX + 15;
+            let y = e.clientY - tooltip.offsetHeight - 10;
+            
+            if (x + tooltip.offsetWidth > window.innerWidth) {
+                x = e.clientX - tooltip.offsetWidth - 15;
+            }
+            
+            if (y < 0) {
+                y = e.clientY + 20;
+            }
+            
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+
+        function handleBarMouseLeave(e) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.classList.remove('show');
+        }
+
+        // FIXED CASCADE FUNCTION V3 - Ensures no Position 0 overlaps
+        function cascadeSchedule(line, startingProductId) {
+            const lineProducts = schedule.filter(p => p.line === line).sort((a, b) => a.id - b.id);
+            const startIndex = lineProducts.findIndex(p => p.id === startingProductId);
+            
+            if (startIndex === -1) return;
+            
+            console.log(`=== Starting cascade for line ${line} from product ${startingProductId} ===`);
+            
+            // Get configured durations
+            const daysPerPosition = parseInt(document.getElementById('daysPerPosition').value);
+            const daysFGItoDelivery = parseInt(document.getElementById('daysFGItoDelivery').value);
+            
+            // CRITICAL: When cascading due to product-specific changes, always cascade from the FIRST product
+            // to ensure Position 0 constraints are maintained throughout the line
+            const actualStartIndex = (startIndex > 0 && horizontalDays[startingProductId]) ? 0 : startIndex;
+            
+            for (let i = actualStartIndex; i < lineProducts.length; i++) {
+                const product = lineProducts[i];
+                const prevProduct = i > 0 ? lineProducts[i - 1] : null;
+                
+                const positions = Object.keys(product.positions).sort((a, b) => {
+                    if (a === 'Delivery') return 1;
+                    if (b === 'Delivery') return -1;
+                    if (a === 'FGI') return 1;
+                    if (b === 'FGI') return -1;
+                    return parseInt(a) - parseInt(b);
+                });
+                
+                console.log(`\nProcessing Product ${product.id}:`);
+                
+                // Determine the start date for Position 0
+                let position0Start;
+                
+                if (i === 0) {
+                    // First product on the line - use configured start date
+                    const lineStartInput = document.getElementById(`startDate${line}`);
+                    if (lineStartInput) {
+                        const dateStr = lineStartInput.value;
+                        const [year, month, day] = dateStr.split('-').map(Number);
+                        position0Start = new Date(year, month - 1, day);
+                        position0Start.setHours(0, 0, 0, 0);
+                    } else {
+                        position0Start = new Date(product.positions['0'].start);
+                    }
+                } else if (prevProduct) {
+                    // CRITICAL FIX: Must wait for previous product to COMPLETELY leave Position 0
+                    position0Start = new Date(prevProduct.positions['0'].end);
+                    position0Start.setDate(position0Start.getDate() + 1);
+                    
+                    // Skip to next working day
+                    while (isWeekend(position0Start) || isHoliday(position0Start) || 
+                           isVerticalDay(position0Start) || isLineNonWorkingDay(position0Start, line)) {
+                        position0Start.setDate(position0Start.getDate() + 1);
+                    }
+                    
+                    // ADDITIONAL CHECK: Ensure we're not starting before previous product is done
+                    const prevProductPos0End = new Date(prevProduct.positions['0'].end);
+                    if (position0Start <= prevProductPos0End) {
+                        position0Start = new Date(prevProductPos0End);
+                        position0Start.setDate(position0Start.getDate() + 1);
+                        while (isWeekend(position0Start) || isHoliday(position0Start) || 
+                               isVerticalDay(position0Start) || isLineNonWorkingDay(position0Start, line)) {
+                            position0Start.setDate(position0Start.getDate() + 1);
+                        }
+                    }
+                } else {
+                    position0Start = new Date(product.positions['0'].start);
+                }
+                
+                console.log(`  Position 0 must start: ${formatDate(position0Start)}`);
+                
+                // Calculate position timings with product-specific non-working days
+                const newPositions = {};
+                let currentStart = new Date(position0Start);
+                
+                for (const pos of positions) {
+                    const requiredDays = (pos === 'Delivery') ? daysFGItoDelivery : daysPerPosition;
+                    
+                    // Calculate the end date considering all non-working days including product-specific ones
+                    let workingDaysCount = 0;
+                    let currentEnd = new Date(currentStart);
+                    currentEnd.setDate(currentEnd.getDate() - 1);
+                    
+                    while (workingDaysCount < requiredDays) {
+                        currentEnd.setDate(currentEnd.getDate() + 1);
+                        const dateStr = formatDate(currentEnd);
+                        
+                        // Check if this is a working day for THIS product
+                        const isProductNonWorking = horizontalDays[product.id] && 
+                            horizontalDays[product.id].includes(dateStr);
+                        
+                        if (!isWeekend(currentEnd) && !isHoliday(currentEnd) && 
+                            !isVerticalDay(currentEnd) && !isLineNonWorkingDay(currentEnd, line) && 
+                            !isProductNonWorking) {
+                            workingDaysCount++;
+                        }
+                    }
+                    
+                    newPositions[pos] = {
+                        start: new Date(currentStart),
+                        end: new Date(currentEnd),
+                        days: requiredDays
+                    };
+                    
+                    console.log(`  ${pos}: ${formatDate(currentStart)} to ${formatDate(currentEnd)} (${requiredDays} working days)`);
+                    
+                    // Next position starts after this one ends
+                    currentStart = new Date(currentEnd);
+                    currentStart.setDate(currentStart.getDate() + 1);
+                    
+                    // Skip non-working days for the start of next position
+                    while (isWeekend(currentStart) || isHoliday(currentStart) || 
+                           isVerticalDay(currentStart) || isLineNonWorkingDay(currentStart, line)) {
+                        currentStart.setDate(currentStart.getDate() + 1);
+                    }
+                }
+                
+                // Apply blocking constraints from previous product
+                if (prevProduct) {
+                    let maxDelay = 0;
+                    
+                    for (const pos of positions) {
+                        if (prevProduct.positions[pos]) {
+                            const prevPosEnd = new Date(prevProduct.positions[pos].end);
+                            const currentPosStart = new Date(newPositions[pos].start);
+                            
+                            // This position can't start until previous product leaves
+                            let minStart = new Date(prevPosEnd);
+                            minStart.setDate(minStart.getDate() + 1);
+                            
+                            // Skip to next working day
+                            while (isWeekend(minStart) || isHoliday(minStart) || 
+                                   isVerticalDay(minStart) || isLineNonWorkingDay(minStart, line)) {
+                                minStart.setDate(minStart.getDate() + 1);
+                            }
+                            
+                            if (currentPosStart < minStart) {
+                                // Calculate delay needed
+                                const msPerDay = 24 * 60 * 60 * 1000;
+                                const delayDays = Math.ceil((minStart - currentPosStart) / msPerDay);
+                                
+                                if (delayDays > maxDelay) {
+                                    maxDelay = delayDays;
+                                    console.log(`  BLOCKING: Position ${pos} requires ${delayDays} day delay (waiting for Product ${prevProduct.id})`);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Apply the maximum delay to ALL positions to maintain continuity
+                    if (maxDelay > 0) {
+                        console.log(`  Applying ${maxDelay} day delay to all positions`);
+                        for (const pos of positions) {
+                            newPositions[pos].start = new Date(newPositions[pos].start);
+                            newPositions[pos].end = new Date(newPositions[pos].end);
+                            newPositions[pos].start.setDate(newPositions[pos].start.getDate() + maxDelay);
+                            newPositions[pos].end.setDate(newPositions[pos].end.getDate() + maxDelay);
+                        }
+                    }
+                }
+                
+                // Update the product's positions
+                product.positions = newPositions;
+                
+                // Verify final positions
+                for (const pos of positions) {
+                    console.log(`  ✓ Position ${pos}: ${formatDate(product.positions[pos].start)} to ${formatDate(product.positions[pos].end)}`);
+                }
+            }
+            
+            console.log('\n=== Cascade complete ===\n');
+        }
+
+        function showContextMenu(e, date) {
+            const menu = document.getElementById('contextMenu');
+            menu.style.display = 'block';
+            
+            let x = e.clientX;
+            let y = e.clientY;
+            
+            const menuRect = menu.getBoundingClientRect();
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            if (x + menu.offsetWidth > windowWidth) {
+                x = windowWidth - menu.offsetWidth - 5;
+            }
+            
+            if (y + menu.offsetHeight > windowHeight) {
+                y = windowHeight - menu.offsetHeight - 5;
+            }
+            
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            
+            currentContextDate = date;
+            
+            const numLines = parseInt(document.getElementById('numLines').value);
+            const lineSubmenu = document.getElementById('lineSubmenu');
+            const lineItems = lineSubmenu.children;
+            for (let i = 0; i < lineItems.length; i++) {
+                if (i < numLines) {
+                    lineItems[i].style.display = 'block';
+                } else {
+                    lineItems[i].style.display = 'none';
+                }
+            }
+        }
+        
+        function showDayContextMenu(e, productId, date, position) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const menu = document.getElementById('dayContextMenu');
+            const toggleItem = document.getElementById('toggleDayItem');
+            
+            currentDayContextProduct = productId;
+            currentDayContextDate = date;
+            currentDayContextPosition = position;
+            
+            const isNonWorking = horizontalDays[productId] && horizontalDays[productId].includes(date);
+            
+            toggleItem.textContent = isNonWorking ? 'Make Working Day' : 'Make Non-Working Day';
+            
+            menu.style.display = 'block';
+            
+            let x = e.clientX;
+            let y = e.clientY;
+            
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            if (x + menu.offsetWidth > windowWidth) {
+                x = windowWidth - menu.offsetWidth - 5;
+            }
+            
+            if (y + menu.offsetHeight > windowHeight) {
+                y = windowHeight - menu.offsetHeight - 5;
+            }
+            
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
+        
+        function toggleProductDay() {
+            if (!currentDayContextProduct || !currentDayContextDate) return;
+            
+            const productId = currentDayContextProduct;
+            const date = currentDayContextDate;
+            
+            if (!horizontalDays[productId]) {
+                horizontalDays[productId] = [];
+            }
+            
+            const isNonWorking = horizontalDays[productId].includes(date);
+            
+            if (isNonWorking) {
+                saveStateForUndo(`Make working day: Product ${productId} on ${date}`);
+                const index = horizontalDays[productId].indexOf(date);
+                if (index > -1) {
+                    horizontalDays[productId].splice(index, 1);
+                }
+                showToast(`Made ${date} a working day for Product ${productId}`);
+            } else {
+                saveStateForUndo(`Make non-working day: Product ${productId} on ${date}`);
+                horizontalDays[productId].push(date);
+                showToast(`Made ${date} a non-working day for Product ${productId}`);
+            }
+            
+            const product = schedule.find(p => p.id === productId);
+            if (product) {
+                console.log('🔍 Check console for cascading details');
+                
+                // Always cascade from the current product when toggling product-specific days
+                // This ensures all subsequent products are properly adjusted
+                cascadeSchedule(product.line, productId);
+            }
+            
+            renderGantt();
+            updateStats();
+            closeDayContextMenu();
+        }
+        
+        function closeDayContextMenu() {
+            document.getElementById('dayContextMenu').style.display = 'none';
+            currentDayContextProduct = null;
+            currentDayContextDate = null;
+            currentDayContextPosition = null;
+        }
+
+        function showLineSubmenu(e) {
+            const submenu = e.currentTarget.querySelector('.submenu');
+            if (submenu) {
+                submenu.style.display = 'block';
+            }
+        }
+
+        function closeContextMenu() {
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        function addVerticalDay() {
+            if (!verticalDays.includes(currentContextDate)) {
+                saveStateForUndo(`Add vertical non-working day: ${currentContextDate}`);
+                verticalDays.push(currentContextDate);
+                regenerateWithNonWorkingDays();
+                showToast(`Added vertical non-working day: ${currentContextDate}`);
+            }
+            closeContextMenu();
+        }
+
+        function addLineNonWorkingDay(line) {
+            if (!lineSpecificNonWorkingDays[line]) {
+                lineSpecificNonWorkingDays[line] = [];
+            }
+            if (!lineSpecificNonWorkingDays[line].includes(currentContextDate)) {
+                saveStateForUndo(`Add non-working day for Line ${line}: ${currentContextDate}`);
+                lineSpecificNonWorkingDays[line].push(currentContextDate);
+                regenerateWithNonWorkingDays();
+                showToast(`Added non-working day for Line ${line}: ${currentContextDate}`);
+            }
+            closeContextMenu();
+        }
+
+        function removeNonWorkingDay() {
+            let removed = false;
+            
+            if (verticalDays.includes(currentContextDate) || 
+                Object.keys(lineSpecificNonWorkingDays).some(line => 
+                    lineSpecificNonWorkingDays[line] && lineSpecificNonWorkingDays[line].includes(currentContextDate)
+                )) {
+                
+                saveStateForUndo(`Remove non-working day: ${currentContextDate}`);
+                
+                const vIndex = verticalDays.indexOf(currentContextDate);
+                if (vIndex > -1) {
+                    verticalDays.splice(vIndex, 1);
+                    removed = true;
+                }
+                
+                Object.keys(lineSpecificNonWorkingDays).forEach(line => {
+                    const index = lineSpecificNonWorkingDays[line].indexOf(currentContextDate);
+                    if (index > -1) {
+                        lineSpecificNonWorkingDays[line].splice(index, 1);
+                        removed = true;
+                    }
+                });
+                
+                if (removed) {
+                    regenerateWithNonWorkingDays();
+                    showToast(`Removed non-working day: ${currentContextDate}`);
+                }
+            }
+            
+            closeContextMenu();
+        }
+
+        function regenerateWithNonWorkingDays() {
+            generateSchedule();
+        }
+
+        function updateStats() {
+            document.getElementById('totalProducts').textContent = schedule.length;
+            
+            if (schedule.length > 0) {
+                const lastProduct = schedule[schedule.length - 1];
+                const duration = Math.floor((lastProduct.positions['Delivery'].end - startDate) / (1000 * 60 * 60 * 24));
+                document.getElementById('scheduleDuration').textContent = `${duration} days`;
+            }
+            
+            const totalNonWorking = verticalDays.length + 
+                Object.values(lineSpecificNonWorkingDays).reduce((sum, days) => sum + days.length, 0) +
+                Object.values(horizontalDays).reduce((sum, days) => sum + days.length, 0);
+            document.getElementById('nonWorkingDays').textContent = totalNonWorking;
+        }
+
+        function saveSchedule() {
+            document.getElementById('saveModal').style.display = 'block';
+        }
+
+        function confirmSave() {
+            const name = document.getElementById('saveName').value;
+            if (!name) {
+                alert('Please enter a name for the schedule');
+                return;
+            }
+            
+            const data = {
+                name: name,
+                date: new Date().toISOString(),
+                schedule: schedule,
+                verticalDays: verticalDays,
+                lineSpecificNonWorkingDays: lineSpecificNonWorkingDays,
+                horizontalDays: horizontalDays,
+                settings: {
+                    daysPerPosition: document.getElementById('daysPerPosition').value,
+                    daysFGItoDelivery: document.getElementById('daysFGItoDelivery').value,
+                    numLines: document.getElementById('numLines').value,
+                    numPositions: document.getElementById('numPositions').value,
+                    productsPerLine: document.getElementById('productsPerLine').value,
+                    startDateA: document.getElementById('startDateA').value,
+                    startDateB: document.getElementById('startDateB').value,
+                    startDateC: document.getElementById('startDateC').value,
+                    startDateD: document.getElementById('startDateD').value
+                }
+            };
+            
+            let savedSchedules = JSON.parse(localStorage.getItem('manufacturingSchedules') || '{}');
+            savedSchedules[name] = data;
+            localStorage.setItem('manufacturingSchedules', JSON.stringify(savedSchedules));
+            
+            closeSaveModal();
+            showToast(`Schedule "${name}" saved successfully`);
+        }
+
+        function closeSaveModal() {
+            document.getElementById('saveModal').style.display = 'none';
+            document.getElementById('saveName').value = '';
+        }
+
+        function loadSchedule() {
+            const savedSchedules = JSON.parse(localStorage.getItem('manufacturingSchedules') || '{}');
+            const select = document.getElementById('loadSelect');
+            select.innerHTML = '';
+            
+            Object.keys(savedSchedules).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = `${name} (${new Date(savedSchedules[name].date).toLocaleDateString()})`;
+                select.appendChild(option);
+            });
+            
+            if (select.options.length === 0) {
+                alert('No saved schedules found');
+                return;
+            }
+            
+            document.getElementById('loadModal').style.display = 'block';
+        }
+
+        function confirmLoad() {
+            const select = document.getElementById('loadSelect');
+            const name = select.value;
+            
+            const savedSchedules = JSON.parse(localStorage.getItem('manufacturingSchedules') || '{}');
+            const data = savedSchedules[name];
+            
+            if (!data) return;
+            
+            schedule = data.schedule.map(product => ({
+                ...product,
+                positions: Object.fromEntries(
+                    Object.entries(product.positions).map(([pos, data]) => {
+                        let startDate, endDate;
+                        
+                        if (typeof data.start === 'string') {
+                            const startMatch = data.start.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (startMatch) {
+                                startDate = new Date(parseInt(startMatch[1]), parseInt(startMatch[2]) - 1, parseInt(startMatch[3]));
+                            } else {
+                                startDate = new Date(data.start);
+                            }
+                        } else {
+                            startDate = new Date(data.start);
+                        }
+                        
+                        if (typeof data.end === 'string') {
+                            const endMatch = data.end.match(/(\d{4})-(\d{2})-(\d{2})/);
+                            if (endMatch) {
+                                endDate = new Date(parseInt(endMatch[1]), parseInt(endMatch[2]) - 1, parseInt(endMatch[3]));
+                            } else {
+                                endDate = new Date(data.end);
+                            }
+                        } else {
+                            endDate = new Date(data.end);
+                        }
+                        
+                        return [
+                            pos,
+                            {
+                                ...data,
+                                start: startDate,
+                                end: endDate
+                            }
+                        ];
+                    })
+                )
+            }));
+            
+            verticalDays = data.verticalDays || [];
+            lineSpecificNonWorkingDays = data.lineSpecificNonWorkingDays || {};
+            horizontalDays = data.horizontalDays || {};
+            
+            document.getElementById('daysPerPosition').value = data.settings.daysPerPosition;
+            document.getElementById('daysFGItoDelivery').value = data.settings.daysFGItoDelivery;
+            document.getElementById('numLines').value = data.settings.numLines;
+            document.getElementById('numPositions').value = data.settings.numPositions || 4;
+            document.getElementById('productsPerLine').value = data.settings.productsPerLine;
+            
+            if (data.settings.startDateA) {
+                document.getElementById('startDateA').value = data.settings.startDateA;
+                document.getElementById('startDateB').value = data.settings.startDateB;
+                document.getElementById('startDateC').value = data.settings.startDateC;
+                document.getElementById('startDateD').value = data.settings.startDateD;
+            } else if (data.settings.startDate) {
+                document.getElementById('startDateA').value = data.settings.startDate;
+            }
+            
+            updateLineStartDates();
+            
+            closeLoadModal();
+            renderGantt();
+            updateStats();
+            showToast(`Schedule "${name}" loaded successfully`);
+        }
+
+        function closeLoadModal() {
+            document.getElementById('loadModal').style.display = 'none';
+        }
+
+        function exportToExcel() {
+            if (schedule.length === 0) {
+                alert('No schedule to export');
+                return;
+            }
+            
+            const wb = XLSX.utils.book_new();
+            
+            const positions = Object.keys(schedule[0].positions);
+            const scheduleHeaders = ['Product', 'Assembly Line'];
+            
+            positions.forEach(pos => {
+                const posLabel = (pos !== 'FGI' && pos !== 'Delivery') ? `Position ${pos}` : pos;
+                scheduleHeaders.push(`${posLabel} Start`, `${posLabel} End`);
+            });
+            
+            const scheduleData = [scheduleHeaders];
+            
+            schedule.forEach(product => {
+                const row = [product.id, product.line];
+                
+                positions.forEach(pos => {
+                    row.push(
+                        formatDate(product.positions[pos].start),
+                        formatDate(product.positions[pos].end)
+                    );
+                });
+                
+                scheduleData.push(row);
+            });
+            
+            const ws1 = XLSX.utils.aoa_to_sheet(scheduleData);
+            XLSX.utils.book_append_sheet(wb, ws1, 'Schedule');
+            
+            const nonWorkingData = [['Product', 'Non-Working Days', 'Count']];
+            
+            schedule.forEach(product => {
+                const productNonWorking = new Set();
+                
+                verticalDays.forEach(day => productNonWorking.add(day));
+                
+                if (lineSpecificNonWorkingDays[product.line]) {
+                    lineSpecificNonWorkingDays[product.line].forEach(day => productNonWorking.add(day));
+                }
+                
+                if (horizontalDays[product.id]) {
+                    horizontalDays[product.id].forEach(day => productNonWorking.add(day));
+                }
+                
+                const days = Array.from(productNonWorking).sort().join(', ') || 'None';
+                nonWorkingData.push([product.id, days, productNonWorking.size]);
+            });
+            
+            const ws2 = XLSX.utils.aoa_to_sheet(nonWorkingData);
+            XLSX.utils.book_append_sheet(wb, ws2, 'Non-Working Days');
+            
+            const workingDaysData = [['Product', 'Position', 'Working Days', 'Calendar Days']];
+            
+            schedule.forEach(product => {
+                Object.entries(product.positions).forEach(([pos, data]) => {
+                    const calendarDays = Math.floor((data.end - data.start) / (1000 * 60 * 60 * 24)) + 1;
+                    const posLabel = (pos !== 'FGI' && pos !== 'Delivery') ? `Position ${pos}` : pos;
+                    workingDaysData.push([product.id, posLabel, data.days, calendarDays]);
+                });
+            });
+            
+            const ws3 = XLSX.utils.aoa_to_sheet(workingDaysData);
+            XLSX.utils.book_append_sheet(wb, ws3, 'Working Days');
+            
+            XLSX.writeFile(wb, `Manufacturing_Schedule_${formatDate(new Date())}.xlsx`);
+            showToast('Schedule exported to Excel successfully');
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.context-menu') && !e.target.closest('.gantt-day-header')) {
+                closeContextMenu();
+            }
+            if (!e.target.closest('#dayContextMenu')) {
+                closeDayContextMenu();
+            }
+        });
+    
+// ==================== CONTROL STATION FUNCTIONS ====================
+        
+        // Initialize control station position dropdown based on current positions
+        function updateControlStationPositions() {
+            // Update all position dropdowns
+            const dropdowns = ['csBasePosition', 'csStartPosition', 'csEndPosition'];
+            
+            dropdowns.forEach(dropdownId => {
+                const select = document.getElementById(dropdownId);
+                if (!select) return;
+                
+                select.innerHTML = '';
+                
+                // Get current number of positions
+                const numPositions = parseInt(document.getElementById('numPositions').value);
+                
+                // Add numbered positions
+                for (let i = 0; i < numPositions; i++) {
+                    const option = document.createElement('option');
+                    option.value = i.toString();
+                    option.textContent = `Position ${i}`;
+                    select.appendChild(option);
+                }
+                
+                // Add FGI and Delivery
+                const fgiOption = document.createElement('option');
+                fgiOption.value = 'FGI';
+                fgiOption.textContent = 'FGI';
+                select.appendChild(fgiOption);
+                
+                const deliveryOption = document.createElement('option');
+                deliveryOption.value = 'Delivery';
+                deliveryOption.textContent = 'Delivery';
+                select.appendChild(deliveryOption);
+            });
+            
+            // Set default for end position to be Position 1
+            const endPositionSelect = document.getElementById('csEndPosition');
+            if (endPositionSelect && endPositionSelect.options.length > 1) {
+                endPositionSelect.selectedIndex = 1;
+            }
+        }
+        
+        // Toggle between control station configuration modes
+        function toggleControlStationMode() {
+            const mode = document.getElementById('csMode').value;
+            const durationConfig = document.getElementById('csDurationConfig');
+            const positionConfig = document.getElementById('csPositionConfig');
+            
+            if (mode === 'duration') {
+                durationConfig.style.display = 'block';
+                positionConfig.style.display = 'none';
+            } else {
+                durationConfig.style.display = 'none';
+                positionConfig.style.display = 'block';
+            }
+        }
+        
+        // Add a new control station
+        function addControlStation() {
+            const name = document.getElementById('csName').value.trim();
+            const mode = document.getElementById('csMode').value;
+            const color = document.getElementById('csColor').value;
+            
+            if (!name) {
+                showToast('Please enter a control station name');
+                return;
+            }
+            
+            // Check for duplicate names
+            if (controlStations.some(cs => cs.name === name)) {
+                showToast(`A control station named "${name}" already exists. Please choose a different name.`);
+                document.getElementById('csName').focus();
+                return;
+            }
+            
+            if (schedule.length === 0) {
+                showToast('Please generate a schedule first');
+                return;
+            }
+            
+            let controlStation;
+            
+            if (mode === 'duration') {
+                // Duration-based mode
+                const basePosition = document.getElementById('csBasePosition').value;
+                const offset = parseInt(document.getElementById('csOffset').value);
+                const duration = parseInt(document.getElementById('csDuration').value);
+                
+                controlStation = {
+                    id: controlStationIdCounter++,
+                    name: name,
+                    mode: 'duration',
+                    basePosition: basePosition,
+                    offset: offset,
+                    duration: duration,
+                    color: color,
+                    products: []
+                };
+            } else {
+                // Position-to-position mode
+                const startPosition = document.getElementById('csStartPosition').value;
+                const startOffset = parseInt(document.getElementById('csStartOffset').value);
+                const endPosition = document.getElementById('csEndPosition').value;
+                const endOffset = parseInt(document.getElementById('csEndOffset').value);
+                
+                controlStation = {
+                    id: controlStationIdCounter++,
+                    name: name,
+                    mode: 'position',
+                    startPosition: startPosition,
+                    startOffset: startOffset,
+                    endPosition: endPosition,
+                    endOffset: endOffset,
+                    color: color,
+                    products: []
+                };
+            }
+            
+            // Calculate control station schedule for each product
+            schedule.forEach(product => {
+                const csProduct = calculateControlStationForProduct(product, controlStation);
+                if (csProduct) {
+                    controlStation.products.push(csProduct);
+                }
+            });
+            
+            controlStations.push(controlStation);
+            
+            // Clear input fields
+            document.getElementById('csName').value = '';
+            document.getElementById('csOffset').value = '0';
+            document.getElementById('csDuration').value = '5';
+            document.getElementById('csStartOffset').value = '-2';
+            document.getElementById('csEndOffset').value = '1';
+            
+            updateControlStationList();
+            renderControlStationGantt();
+            updateControlStationStats();
+            
+            showToast(`Added control station: ${name}`);
+        }
+        
+        // Calculate control station schedule for a specific product
+        // Calculate control station schedule for a specific product
+        function calculateControlStationForProduct(product, controlStation) {
+            let csStartMDay, csEndMDay;
+            
+            // Position 0 is always M-day 1
+            const getMDayForPosition = (positionName) => {
+                if (positionName === '0') return 1;
+                
+                // Count working days from Position 0 start to the target position start
+                let mDay = 1;
+                let currentDate = new Date(product.positions['0'].start);
+                currentDate.setHours(0, 0, 0, 0);
+                const targetDate = new Date(product.positions[positionName].start);
+                targetDate.setHours(0, 0, 0, 0);
+                
+                while (currentDate < targetDate) {
+                    const dateStr = formatDate(currentDate);
+                    if (!isWeekend(currentDate) && !isHoliday(currentDate) && 
+                        !isVerticalDay(currentDate) && !isLineNonWorkingDay(currentDate, product.line) && 
+                        !(horizontalDays[product.id] && horizontalDays[product.id].includes(dateStr))) {
+                        mDay++;
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                return mDay;
+            };
+            
+            // Helper to adjust M-day accounting for no M0
+            const adjustForNoM0 = (mDay) => {
+                // Only adjust if the calculation exactly hits 0
+                if (mDay === 0) {
+                    return -1; // M0 doesn't exist, so 0 becomes -1
+                }
+                return mDay;
+            };
+            
+            // Helper to calculate M-day with offset, accounting for M0 gap
+            const calculateMDayWithOffset = (baseMDay, offset) => {
+                let result = baseMDay + offset;
+                // If crossing from positive to negative or vice versa, account for M0
+                if (baseMDay > 0 && result <= 0) {
+                    // Crossing from positive to negative, skip M0
+                    result--;
+                } else if (baseMDay < 0 && result >= 0) {
+                    // Crossing from negative to positive, skip M0
+                    result++;
+                }
+                return result;
+            };
+            
+            if (controlStation.mode === 'duration') {
+                // Duration-based mode
+                const position = product.positions[controlStation.basePosition];
+                if (!position) return null;
+                
+                const mDayAtPosition = getMDayForPosition(controlStation.basePosition);
+                
+                // Apply offset with M0 gap handling
+                // Note: Positive offsets are interpreted as "flow day N" (1-based)
+                // So +1 means flow day 1 (the start), +2 means flow day 2, etc.
+                // Negative offsets go before the position start
+                let adjustedOffset = controlStation.offset > 0 ? 
+                    controlStation.offset - 1 : controlStation.offset;
+                
+                csStartMDay = calculateMDayWithOffset(mDayAtPosition, adjustedOffset);
+                
+                // Duration is the COUNT of M-days, not arithmetic
+                // Count from start, skipping M0 if we encounter it
+                let count = 1; // Start day counts as 1
+                csEndMDay = csStartMDay;
+                
+                while (count < controlStation.duration) {
+                    csEndMDay++;
+                    if (csEndMDay === 0) {
+                        // Skip M0 - it doesn't exist
+                        csEndMDay = 1;
+                    }
+                    count++;
+                }
+                
+            } else {
+                // Position-to-position mode
+                const startPosition = product.positions[controlStation.startPosition];
+                const endPosition = product.positions[controlStation.endPosition];
+                if (!startPosition || !endPosition) return null;
+                
+                const mDayAtStartPosition = getMDayForPosition(controlStation.startPosition);
+                const mDayAtEndPosition = getMDayForPosition(controlStation.endPosition);
+                
+                // Apply offsets with M0 gap handling
+                // Note: Positive offsets are interpreted as "flow day N" (1-based)
+                // So +1 means flow day 1 (the start), +2 means flow day 2, etc.
+                // Negative offsets go before the position start
+                let adjustedStartOffset = controlStation.startOffset > 0 ? 
+                    controlStation.startOffset - 1 : controlStation.startOffset;
+                let adjustedEndOffset = controlStation.endOffset > 0 ? 
+                    controlStation.endOffset - 1 : controlStation.endOffset;
+                
+                csStartMDay = calculateMDayWithOffset(mDayAtStartPosition, adjustedStartOffset);
+                csEndMDay = calculateMDayWithOffset(mDayAtEndPosition, adjustedEndOffset);
+            }
+            
+            // Convert M-days back to calendar dates (handling negative M-days)
+            let csStartDate = null;
+            let csEndDate = null;
+            let workingDays = [];
+            let nonWorkingDays = [];
+            
+            // Calculate the actual dates
+            if (csStartMDay < 1) {
+                // For negative M-days, count backwards from Position 0
+                let tempDate = new Date(product.positions['0'].start);
+                tempDate.setHours(0, 0, 0, 0);
+                tempDate.setDate(tempDate.getDate() - 1); // Start from day before Position 0
+                
+                let currentMDay = -1; // Day before Position 0 is M-1
+                
+                // Go backwards to find start date
+                while (currentMDay >= csStartMDay) {
+                    const dateStr = formatDate(tempDate);
+                    const isWorkingDay = !isWeekend(tempDate) && !isHoliday(tempDate) && 
+                        !isVerticalDay(tempDate) && !isLineNonWorkingDay(tempDate, product.line) && 
+                        !(horizontalDays[product.id] && horizontalDays[product.id].includes(dateStr));
+                    
+                    if (isWorkingDay) {
+                        if (currentMDay === csStartMDay) {
+                            csStartDate = new Date(tempDate);
+                        }
+                        if (currentMDay >= csStartMDay && currentMDay <= csEndMDay && currentMDay < 1) {
+                            workingDays.push(dateStr);
+                        }
+                        currentMDay--;
+                    } else if (currentMDay >= csStartMDay && currentMDay <= csEndMDay && currentMDay < 1) {
+                        nonWorkingDays.push(dateStr);
+                    }
+                    
+                    tempDate.setDate(tempDate.getDate() - 1);
+                }
+                
+                // Reverse arrays since we built them backwards
+                workingDays.reverse();
+                nonWorkingDays.reverse();
+            } else {
+                // For positive M-days, count forward from Position 0
+                let currentDate = new Date(product.positions['0'].start);
+                currentDate.setHours(0, 0, 0, 0);
+                let currentMDay = 1;
+                
+                const maxDate = new Date(product.positions['Delivery'].end);
+                maxDate.setDate(maxDate.getDate() + 30);
+                
+                while (currentDate <= maxDate && (csEndDate === null || currentMDay <= csEndMDay)) {
+                    const dateStr = formatDate(currentDate);
+                    const isWorkingDay = !isWeekend(currentDate) && !isHoliday(currentDate) && 
+                        !isVerticalDay(currentDate) && !isLineNonWorkingDay(currentDate, product.line) && 
+                        !(horizontalDays[product.id] && horizontalDays[product.id].includes(dateStr));
+                    
+                    if (isWorkingDay) {
+                        if (currentMDay === csStartMDay) {
+                            csStartDate = new Date(currentDate);
+                        }
+                        if (currentMDay === csEndMDay) {
+                            csEndDate = new Date(currentDate);
+                        }
+                        if (currentMDay >= csStartMDay && currentMDay <= csEndMDay) {
+                            workingDays.push(dateStr);
+                        }
+                        currentMDay++;
+                    } else if (currentMDay >= csStartMDay && csEndDate === null) {
+                        nonWorkingDays.push(dateStr);
+                    }
+                    
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+            
+            // Handle case where control station spans from negative to positive M-days
+            if (csStartMDay < 1 && csEndMDay >= 1) {
+                // Continue forward from Position 0 for the positive portion
+                let currentDate = new Date(product.positions['0'].start);
+                currentDate.setHours(0, 0, 0, 0);
+                let currentMDay = 1;
+                
+                const maxDate = new Date(product.positions['Delivery'].end);
+                maxDate.setDate(maxDate.getDate() + 30);
+                
+                while (currentDate <= maxDate && currentMDay <= csEndMDay) {
+                    const dateStr = formatDate(currentDate);
+                    const isWorkingDay = !isWeekend(currentDate) && !isHoliday(currentDate) && 
+                        !isVerticalDay(currentDate) && !isLineNonWorkingDay(currentDate, product.line) && 
+                        !(horizontalDays[product.id] && horizontalDays[product.id].includes(dateStr));
+                    
+                    if (isWorkingDay) {
+                        if (currentMDay === csEndMDay) {
+                            csEndDate = new Date(currentDate);
+                        }
+                        workingDays.push(dateStr);
+                        currentMDay++;
+                    } else {
+                        nonWorkingDays.push(dateStr);
+                    }
+                    
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+            
+            if (!csStartDate) return null;
+            if (!csEndDate) csEndDate = csStartDate;
+            
+            return {
+                productId: product.id,
+                productLine: product.line,
+                startDate: csStartDate,
+                endDate: csEndDate,
+                startMDay: csStartMDay,
+                endMDay: csEndMDay,
+                workingDays: workingDays,
+                nonWorkingDays: nonWorkingDays
+            };
+        }
+        
+        // Update control station list display
+        function updateControlStationList() {
+            const container = document.getElementById('csListContainer');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            controlStations.forEach(cs => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
+                
+                const info = document.createElement('div');
+                let description;
+                
+                if (cs.mode === 'duration') {
+                    description = `Based on ${cs.basePosition}, Offset: ${cs.offset > 0 ? '+' : ''}${cs.offset} M-days, Duration: ${cs.duration} M-days`;
+                } else {
+                    description = `From ${cs.startPosition} ${cs.startOffset > 0 ? '+' : ''}${cs.startOffset} to ${cs.endPosition} ${cs.endOffset > 0 ? '+' : ''}${cs.endOffset} M-days`;
+                }
+                
+                info.innerHTML = `
+                    <span style="color: ${cs.color};">■</span>
+                    <strong>${cs.name}</strong> - ${description}
+                `;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = 'Remove';
+                removeBtn.style.cssText = 'padding: 4px 10px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;';
+                removeBtn.onclick = () => removeControlStation(cs.id);
+                
+                item.appendChild(info);
+                item.appendChild(removeBtn);
+                container.appendChild(item);
+            });
+        }
+        
+        // Remove a control station
+        function removeControlStation(id) {
+            const cs = controlStations.find(c => c.id === id);
+            if (cs && confirm(`Remove control station "${cs.name}"?`)) {
+                controlStations = controlStations.filter(c => c.id !== id);
+                updateControlStationList();
+                renderControlStationGantt();
+                updateControlStationStats();
+                showToast(`Removed control station: ${cs.name}`);
+            }
+        }
+        
+        // Clear all control stations
+        function clearControlStations() {
+            if (controlStations.length > 0 && confirm('Clear all control stations?')) {
+                controlStations = [];
+                controlStationIdCounter = 1; // Reset ID counter
+                updateControlStationList();
+                renderControlStationGantt();
+                updateControlStationStats();
+                showToast('Cleared all control stations');
+            }
+        }
+        
+        // Update M-day reference display
+        function updateMDayReference() {
+            const container = document.getElementById('mDayReference');
+            if (!container || schedule.length === 0) return;
+            
+            // Use the first product as reference (all products follow same template)
+            const product = schedule[0];
+            const positions = Object.keys(product.positions);
+            const daysPerPosition = parseInt(document.getElementById('daysPerPosition').value);
+            
+            let html = '';
+            let currentMDay = 1;
+            
+            positions.forEach(pos => {
+                const posLabel = (pos !== 'FGI' && pos !== 'Delivery') ? `Position ${pos}` : pos;
+                const duration = product.positions[pos].days;
+                const endMDay = currentMDay + duration - 1;
+                
+                html += `<div style="margin: 2px 0; padding: 2px;">`;
+                html += `<strong style="display: inline-block; width: 120px;">${posLabel}:</strong>`;
+                html += `<span style="color: #059669;">M${currentMDay} - M${endMDay}</span>`;
+                html += ` <span style="color: #999;">(${duration} working days)</span>`;
+                html += `</div>`;
+                
+                currentMDay = endMDay + 1;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Update control station statistics
+        function updateControlStationStats() {
+            const totalElement = document.getElementById('totalControlStations');
+            if (totalElement) {
+                totalElement.textContent = controlStations.length;
+            }
+        }
+        
+        // Render control station Gantt chart
+        // Render control station Gantt chart (Template View)
+        function renderControlStationGantt() {
+            const headerTimeline = document.getElementById('csGanttHeaderTimeline');
+            const ganttBody = document.getElementById('csGanttBody');
+            
+            if (!headerTimeline || !ganttBody) return;
+            
+            headerTimeline.innerHTML = '';
+            ganttBody.innerHTML = '';
+            
+            if (controlStations.length === 0 || schedule.length === 0) return;
+            
+            // Use first product as template reference
+            const templateProduct = schedule[0];
+            
+            // Find the M-day range (including negative M-days)
+            let minMDay = 0;
+            let maxMDay = 0;
+            
+            controlStations.forEach(cs => {
+                if (cs.products.length > 0) {
+                    const product = cs.products[0];
+                    if (product.startMDay < minMDay) minMDay = product.startMDay;
+                    if (product.endMDay > maxMDay) maxMDay = product.endMDay;
+                }
+            });
+            
+            // Add buffer
+            minMDay = Math.min(minMDay, -5);
+            maxMDay = Math.max(maxMDay, 50);
+            
+            // Generate M-day header (including negative M-days)
+            for (let mDay = minMDay; mDay <= maxMDay; mDay++) {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'gantt-day-header';
+                dayHeader.style.cssText = 'width: 40px; min-width: 40px; background: #e0f2fe; font-size: 10px;';
+                
+                if (mDay === 0) {
+                    // Skip M0 as it doesn't exist
+                    continue;
+                } else if (mDay < 0) {
+                    dayHeader.style.background = '#fee2e2'; // Light red for negative days
+                    dayHeader.innerHTML = `M${mDay}`;
+                } else {
+                    // Mark position starts with darker background
+                    let isPositionStart = false;
+                    let positionName = '';
+                    
+                    Object.entries(templateProduct.positions).forEach(([pos, data]) => {
+                        const startMDay = getMDayForTemplatePosition(pos, templateProduct);
+                        if (startMDay === mDay) {
+                            isPositionStart = true;
+                            positionName = pos;
+                        }
+                    });
+                    
+                    if (isPositionStart) {
+                        dayHeader.style.background = '#059669';
+                        dayHeader.style.color = 'white';
+                        dayHeader.style.fontWeight = 'bold';
+                        dayHeader.title = `Start of ${positionName !== 'FGI' && positionName !== 'Delivery' ? 'Position ' + positionName : positionName}`;
+                    }
+                    
+                    dayHeader.innerHTML = `M${mDay}`;
+                }
+                
+                headerTimeline.appendChild(dayHeader);
+            }
+            
+            // Helper function to create position reference row
+            const createPositionReferenceRow = (label) => {
+                const refRow = document.createElement('div');
+                refRow.className = 'gantt-row';
+                refRow.style.cssText = 'background: #f9fafb; border: 2px solid #059669;';
+                
+                const refLabel = document.createElement('div');
+                refLabel.className = 'gantt-product-label';
+                refLabel.style.cssText = 'width: 200px; min-width: 200px; font-size: 11px; font-weight: bold; color: #059669;';
+                refLabel.textContent = label;
+                refRow.appendChild(refLabel);
+                
+                const refTimeline = document.createElement('div');
+                refTimeline.className = 'gantt-timeline';
+                refTimeline.style.position = 'relative';
+                
+                // Add M-day cells for background
+                for (let mDay = minMDay; mDay <= maxMDay; mDay++) {
+                    if (mDay === 0) continue;
+                    const dayCell = document.createElement('div');
+                    dayCell.style.cssText = 'width: 40px; min-width: 40px; height: 35px; border-right: 1px solid #e0e0e0; display: inline-block;';
+                    refTimeline.appendChild(dayCell);
+                }
+                
+                // Add reference bars for positions
+                Object.entries(templateProduct.positions).forEach(([pos, data]) => {
+                    const startMDay = getMDayForTemplatePosition(pos, templateProduct);
+                    const duration = data.days;
+                    
+                    const leftPosition = mDay => {
+                        if (mDay < 0) return (mDay - minMDay) * 40;
+                        else if (mDay > 0) return (mDay - minMDay - 1) * 40;
+                        return 0;
+                    };
+                    
+                    const posBar = document.createElement('div');
+                    posBar.style.cssText = `
+                        position: absolute;
+                        height: 25px;
+                        top: 5px;
+                        left: ${leftPosition(startMDay)}px;
+                        width: ${duration * 40 - 4}px;
+                        background: rgba(5, 150, 105, 0.3);
+                        border: 2px solid #059669;
+                        border-radius: 4px;
+                        font-size: 10px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: #059669;
+                        font-weight: bold;
+                    `;
+                    posBar.textContent = pos !== 'FGI' && pos !== 'Delivery' ? `Pos ${pos}` : pos;
+                    posBar.title = `${pos !== 'FGI' && pos !== 'Delivery' ? 'Position ' + pos : pos}: M${startMDay} - M${startMDay + duration - 1}`;
+                    refTimeline.appendChild(posBar);
+                });
+                
+                refRow.appendChild(refTimeline);
+                return refRow;
+            };
+            
+            // Add TOP position reference row
+            ganttBody.appendChild(createPositionReferenceRow('Position Reference'));
+            
+            // Stack control stations that don't overlap
+            const rows = [];
+            
+            controlStations.forEach(cs => {
+                if (cs.products.length === 0) return;
+                
+                const csData = cs.products[0]; // Use template from first product
+                
+                // Find a row where this control station fits without overlap
+                let rowIndex = -1;
+                for (let i = 0; i < rows.length; i++) {
+                    let hasOverlap = false;
+                    for (let existingCs of rows[i]) {
+                        const existingData = existingCs.products[0];
+                        // Check for overlap
+                        if (!((csData.endMDay < existingData.startMDay) || (csData.startMDay > existingData.endMDay))) {
+                            hasOverlap = true;
+                            break;
+                        }
+                    }
+                    if (!hasOverlap) {
+                        rowIndex = i;
+                        break;
+                    }
+                }
+                
+                // If no existing row works, create a new one
+                if (rowIndex === -1) {
+                    rows.push([cs]);
+                } else {
+                    rows[rowIndex].push(cs);
+                }
+            });
+            
+            // Render stacked rows
+            rows.forEach((rowStations, rowNum) => {
+                const row = document.createElement('div');
+                row.className = 'gantt-row';
+                row.style.minHeight = '35px';
+                
+                // Row label
+                const label = document.createElement('div');
+                label.className = 'gantt-product-label';
+                label.style.cssText = 'width: 200px; min-width: 200px; font-size: 11px;';
+                label.textContent = `Control Station Row ${rowNum + 1}`;
+                row.appendChild(label);
+                
+                // Timeline
+                const timeline = document.createElement('div');
+                timeline.className = 'gantt-timeline';
+                timeline.style.position = 'relative';
+                
+                // Add M-day cells
+                for (let mDay = minMDay; mDay <= maxMDay; mDay++) {
+                    if (mDay === 0) continue; // Skip M0
+                    const dayCell = document.createElement('div');
+                    dayCell.style.cssText = 'width: 40px; min-width: 40px; height: 35px; border-right: 1px solid #f0f0f0; display: inline-block;';
+                    
+                    // Highlight position boundaries
+                    Object.entries(templateProduct.positions).forEach(([pos, data]) => {
+                        const startMDay = getMDayForTemplatePosition(pos, templateProduct);
+                        if (startMDay === mDay) {
+                            dayCell.style.borderLeft = '2px solid rgba(5, 150, 105, 0.3)';
+                        }
+                    });
+                    
+                    timeline.appendChild(dayCell);
+                }
+                
+                // Add control station bars for this row
+                rowStations.forEach(cs => {
+                    const csData = cs.products[0];
+                    const bar = document.createElement('div');
+                    
+                    // Calculate position accounting for negative M-days
+                    const leftPosition = mDay => {
+                        if (mDay < 0) {
+                            return (mDay - minMDay) * 40;
+                        } else if (mDay > 0) {
+                            return (mDay - minMDay - 1) * 40; // -1 because we skip M0
+                        }
+                        return 0;
+                    };
+                    
+                    // Calculate width accounting for M0 gap
+                    let width;
+                    if (csData.startMDay < 0 && csData.endMDay > 0) {
+                        // Spans across M0 - subtract 1 from arithmetic difference for the non-existent M0
+                        width = ((csData.endMDay - csData.startMDay + 1) - 1) * 40 - 4;
+                    } else {
+                        // Doesn't cross M0 - normal calculation
+                        width = (csData.endMDay - csData.startMDay + 1) * 40 - 4;
+                    }
+                    
+                    bar.style.cssText = `
+                        position: absolute;
+                        height: 25px;
+                        top: 5px;
+                        left: ${leftPosition(csData.startMDay)}px;
+                        width: ${width}px;
+                        background: ${cs.color};
+                        border-radius: 4px;
+                        color: white;
+                        font-size: 10px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 0 5px;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                        cursor: pointer;
+                    `;
+                    bar.textContent = cs.name;
+                    
+                    // Build detailed tooltip
+                    let configDetails;
+                    if (cs.mode === 'duration') {
+                        configDetails = `Based on ${cs.basePosition} ${cs.offset >= 0 ? '+' : ''}${cs.offset}, Duration: ${cs.duration}`;
+                    } else {
+                        configDetails = `From ${cs.startPosition}${cs.startOffset >= 0 ? '+' : ''}${cs.startOffset} to ${cs.endPosition}${cs.endOffset >= 0 ? '+' : ''}${cs.endOffset}`;
+                    }
+                    
+                    bar.title = `${cs.name}\nM${csData.startMDay} to M${csData.endMDay}\nConfiguration: ${configDetails}`;
+                    
+                    timeline.appendChild(bar);
+                });
+                
+                row.appendChild(timeline);
+                ganttBody.appendChild(row);
+            });
+            
+            // Add BOTTOM position reference row
+            ganttBody.appendChild(createPositionReferenceRow('Position Reference'));
+        }
+        
+        // Helper function to get M-day for a position in the template
+        function getMDayForTemplatePosition(positionName, product) {
+            if (positionName === '0') return 1;
+            
+            let mDay = 1;
+            const positions = Object.keys(product.positions);
+            
+            for (let pos of positions) {
+                if (pos === positionName) break;
+                mDay += product.positions[pos].days;
+            }
+            
+            return mDay;
+        }
+        
+        // Export control stations to Excel
+        function exportControlStations() {
+            if (controlStations.length === 0) {
+                alert('No control stations to export');
+                return;
+            }
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Sheet 1: Control Station Working Days
+            const workingDaysData = [['Product', 'Control Station', 'Start M-Day', 'End M-Day', 'Working Days (Dates)']];
+            
+            controlStations.forEach(cs => {
+                cs.products.forEach(product => {
+                    const productInfo = schedule.find(p => p.id === product.productId);
+                    workingDaysData.push([
+                        `${product.productId} - Line ${product.productLine}`,
+                        cs.name,
+                        `M${product.startMDay}`,
+                        `M${product.endMDay}`,
+                        product.workingDays.join(', ')
+                    ]);
+                });
+            });
+            
+            const ws1 = XLSX.utils.aoa_to_sheet(workingDaysData);
+            XLSX.utils.book_append_sheet(wb, ws1, 'CS Working Days');
+            
+            // Sheet 2: Control Station Non-Working Days
+            const nonWorkingDaysData = [['Product', 'Control Station', 'Non-Working Days (Within CS Period)', 'Count']];
+            
+            controlStations.forEach(cs => {
+                cs.products.forEach(product => {
+                    const productInfo = schedule.find(p => p.id === product.productId);
+                    if (product.nonWorkingDays.length > 0) {
+                        nonWorkingDaysData.push([
+                            `${product.productId} - Line ${product.productLine}`,
+                            cs.name,
+                            product.nonWorkingDays.join(', '),
+                            product.nonWorkingDays.length
+                        ]);
+                    } else {
+                        nonWorkingDaysData.push([
+                            `${product.productId} - Line ${product.productLine}`,
+                            cs.name,
+                            'None',
+                            0
+                        ]);
+                    }
+                });
+            });
+            
+            const ws2 = XLSX.utils.aoa_to_sheet(nonWorkingDaysData);
+            XLSX.utils.book_append_sheet(wb, ws2, 'CS Non-Working Days');
+            
+            // Sheet 3: Control Station Summary
+            const summaryData = [['Control Station', 'Configuration Type', 'Configuration Details', 'Total Products']];
+            
+            controlStations.forEach(cs => {
+                let configDetails;
+                if (cs.mode === 'duration') {
+                    configDetails = `Based on ${cs.basePosition} ${cs.offset >= 0 ? '+' : ''}${cs.offset} M-days, Duration: ${cs.duration} M-days`;
+                } else {
+                    configDetails = `From ${cs.startPosition} ${cs.startOffset >= 0 ? '+' : ''}${cs.startOffset} to ${cs.endPosition} ${cs.endOffset >= 0 ? '+' : ''}${cs.endOffset} M-days`;
+                }
+                
+                summaryData.push([
+                    cs.name,
+                    cs.mode === 'duration' ? 'Duration-based' : 'Position-to-Position',
+                    configDetails,
+                    cs.products.length
+                ]);
+            });
+            
+            const ws3 = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, ws3, 'CS Summary');
+            
+            // Write file
+            XLSX.writeFile(wb, `Control_Stations_${formatDate(new Date())}.xlsx`);
+            showToast('Control stations exported to Excel successfully');
+        }
+        
+        // Export Combined Schedule - Positions and Control Stations
+        function exportCombinedSchedule() {
+            if (schedule.length === 0) {
+                alert('No schedule to export');
+                return;
+            }
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Sheet 1: Combined Schedule with Positions and Control Stations
+            const positions = Object.keys(schedule[0].positions);
+            const combinedHeaders = ['Product', 'Assembly Line'];
+            
+            // Add headers for each position
+            positions.forEach(pos => {
+                const posLabel = (pos !== 'FGI' && pos !== 'Delivery') ? `Position ${pos}` : pos;
+                combinedHeaders.push(`${posLabel} Start`, `${posLabel} End`);
+            });
+            
+            // Add headers for each control station
+            controlStations.forEach(cs => {
+                combinedHeaders.push(`${cs.name} Start`, `${cs.name} End`, `${cs.name} Working Days`);
+            });
+            
+            const combinedData = [combinedHeaders];
+            
+            schedule.forEach(product => {
+                const row = [product.id, product.line];
+                
+                // Add position dates
+                positions.forEach(pos => {
+                    row.push(
+                        formatDate(product.positions[pos].start),
+                        formatDate(product.positions[pos].end)
+                    );
+                });
+                
+                // Add control station dates
+                controlStations.forEach(cs => {
+                    const csProduct = cs.products.find(p => p.productId === product.id);
+                    if (csProduct) {
+                        row.push(
+                            formatDate(csProduct.startDate),
+                            formatDate(csProduct.endDate),
+                            csProduct.workingDays.length
+                        );
+                    } else {
+                        row.push('N/A', 'N/A', 0);
+                    }
+                });
+                
+                combinedData.push(row);
+            });
+            
+            const ws1 = XLSX.utils.aoa_to_sheet(combinedData);
+            XLSX.utils.book_append_sheet(wb, ws1, 'Combined Schedule');
+            
+            // Sheet 2: Control Station Working Days Detail
+            const csWorkingDaysData = [['Product', 'Line', 'Control Station', 'M-Day Range', 'Working Dates', 'Non-Working Dates']];
+            
+            schedule.forEach(product => {
+                controlStations.forEach(cs => {
+                    const csProduct = cs.products.find(p => p.productId === product.id);
+                    if (csProduct) {
+                        csWorkingDaysData.push([
+                            product.id,
+                            product.line,
+                            cs.name,
+                            `M${csProduct.startMDay} - M${csProduct.endMDay}`,
+                            csProduct.workingDays.join(', '),
+                            csProduct.nonWorkingDays.join(', ') || 'None'
+                        ]);
+                    }
+                });
+            });
+            
+            const ws2 = XLSX.utils.aoa_to_sheet(csWorkingDaysData);
+            XLSX.utils.book_append_sheet(wb, ws2, 'CS Working Days Detail');
+            
+            // Sheet 3: Non-Working Days Summary
+            const nonWorkingData = [['Product', 'Line', 'Vertical Days', 'Line-Specific Days', 'Product-Specific Days', 'Total Non-Working']];
+            
+            schedule.forEach(product => {
+                const verticalDaysForProduct = verticalDays.join(', ') || 'None';
+                const lineDays = (lineSpecificNonWorkingDays[product.line] || []).join(', ') || 'None';
+                const productDays = (horizontalDays[product.id] || []).join(', ') || 'None';
+                const totalNonWorking = 
+                    verticalDays.length + 
+                    (lineSpecificNonWorkingDays[product.line] || []).length + 
+                    (horizontalDays[product.id] || []).length;
+                
+                nonWorkingData.push([
+                    product.id,
+                    product.line,
+                    verticalDaysForProduct,
+                    lineDays,
+                    productDays,
+                    totalNonWorking
+                ]);
+            });
+            
+            const ws3 = XLSX.utils.aoa_to_sheet(nonWorkingData);
+            XLSX.utils.book_append_sheet(wb, ws3, 'Non-Working Days');
+            
+            // Sheet 4: Control Station Configuration
+            const csConfigData = [['Control Station', 'Configuration Type', 'Configuration Details', 'Color']];
+            
+            controlStations.forEach(cs => {
+                let configDetails;
+                if (cs.mode === 'duration') {
+                    configDetails = `Based on ${cs.basePosition} ${cs.offset >= 0 ? '+' : ''}${cs.offset} M-days, Duration: ${cs.duration} M-days`;
+                } else {
+                    configDetails = `From ${cs.startPosition} ${cs.startOffset >= 0 ? '+' : ''}${cs.startOffset} to ${cs.endPosition} ${cs.endOffset >= 0 ? '+' : ''}${cs.endOffset} M-days`;
+                }
+                
+                csConfigData.push([
+                    cs.name,
+                    cs.mode === 'duration' ? 'Duration-based' : 'Position-to-Position',
+                    configDetails,
+                    cs.color
+                ]);
+            });
+            
+            const ws4 = XLSX.utils.aoa_to_sheet(csConfigData);
+            XLSX.utils.book_append_sheet(wb, ws4, 'CS Configuration');
+            
+            // Write file
+            XLSX.writeFile(wb, `Combined_Schedule_${formatDate(new Date())}.xlsx`);
+            showToast('Combined schedule exported to Excel successfully');
+        }
+        
+        // Export Detailed Daily Schedule - Every calendar day with M-day/Non-M-day indicator
+        function exportDetailedDailySchedule() {
+            if (schedule.length === 0) {
+                alert('No schedule to export');
+                return;
+            }
+            
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            
+            // Sheet 1: Daily Position Breakdown
+            const dailyData = [['Product', 'Position/Station', 'Date', 'Day Type']];
+            
+            // Process each product's positions
+            schedule.forEach(product => {
+                Object.entries(product.positions).forEach(([posName, posData]) => {
+                    const posLabel = (posName !== 'FGI' && posName !== 'Delivery') ? `Position ${posName}` : posName;
+                    
+                    // Generate all dates from start to end
+                    let currentDate = new Date(posData.start);
+                    currentDate.setHours(0, 0, 0, 0);
+                    const endDate = new Date(posData.end);
+                    endDate.setHours(0, 0, 0, 0);
+                    
+                    while (currentDate <= endDate) {
+                        const dateStr = formatDate(currentDate);
+                        
+                        // Determine if it's a working day or not
+                        const isWorkingDay = !isWeekend(currentDate) && 
+                            !isHoliday(currentDate) && 
+                            !isVerticalDay(currentDate) && 
+                            !isLineNonWorkingDay(currentDate, product.line) && 
+                            !(horizontalDays[product.id] && horizontalDays[product.id].includes(dateStr));
+                        
+                        dailyData.push([
+                            product.id,
+                            posLabel,
+                            dateStr,
+                            isWorkingDay ? 'M DAY' : 'NON M DAY'
+                        ]);
+                        
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                });
+            });
+            
+            const ws1 = XLSX.utils.aoa_to_sheet(dailyData);
+            XLSX.utils.book_append_sheet(wb, ws1, 'Position Daily Breakdown');
+            
+            // Sheet 2: Daily Control Station Breakdown (if control stations exist)
+            if (controlStations.length > 0) {
+                const csDailyData = [['Product', 'Control Station', 'Date', 'Day Type']];
+                
+                controlStations.forEach(cs => {
+                    cs.products.forEach(csProduct => {
+                        // Generate all dates from start to end
+                        let currentDate = new Date(csProduct.startDate);
+                        currentDate.setHours(0, 0, 0, 0);
+                        const endDate = new Date(csProduct.endDate);
+                        endDate.setHours(0, 0, 0, 0);
+                        
+                        while (currentDate <= endDate) {
+                            const dateStr = formatDate(currentDate);
+                            
+                            // Check if this date is in the working days array
+                            const isWorkingDay = csProduct.workingDays.includes(dateStr);
+                            
+                            csDailyData.push([
+                                csProduct.productId,
+                                cs.name,
+                                dateStr,
+                                isWorkingDay ? 'M DAY' : 'NON M DAY'
+                            ]);
+                            
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                    });
+                });
+                
+                const ws2 = XLSX.utils.aoa_to_sheet(csDailyData);
+                XLSX.utils.book_append_sheet(wb, ws2, 'Control Station Daily Breakdown');
+            }
+            
+            // Sheet 3: Combined Daily Breakdown (both positions and control stations)
+            const combinedDailyData = [['Product', 'Position/Station', 'Date', 'Day Type', 'Category']];
+            
+            // Add position data
+            schedule.forEach(product => {
+                Object.entries(product.positions).forEach(([posName, posData]) => {
+                    const posLabel = (posName !== 'FGI' && posName !== 'Delivery') ? `Position ${posName}` : posName;
+                    
+                    let currentDate = new Date(posData.start);
+                    currentDate.setHours(0, 0, 0, 0);
+                    const endDate = new Date(posData.end);
+                    endDate.setHours(0, 0, 0, 0);
+                    
+                    while (currentDate <= endDate) {
+                        const dateStr = formatDate(currentDate);
+                        
+                        const isWorkingDay = !isWeekend(currentDate) && 
+                            !isHoliday(currentDate) && 
+                            !isVerticalDay(currentDate) && 
+                            !isLineNonWorkingDay(currentDate, product.line) && 
+                            !(horizontalDays[product.id] && horizontalDays[product.id].includes(dateStr));
+                        
+                        combinedDailyData.push([
+                            product.id,
+                            posLabel,
+                            dateStr,
+                            isWorkingDay ? 'M DAY' : 'NON M DAY',
+                            'Position'
+                        ]);
+                        
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+                });
+            });
+            
+            // Add control station data
+            if (controlStations.length > 0) {
+                controlStations.forEach(cs => {
+                    cs.products.forEach(csProduct => {
+                        let currentDate = new Date(csProduct.startDate);
+                        currentDate.setHours(0, 0, 0, 0);
+                        const endDate = new Date(csProduct.endDate);
+                        endDate.setHours(0, 0, 0, 0);
+                        
+                        while (currentDate <= endDate) {
+                            const dateStr = formatDate(currentDate);
+                            const isWorkingDay = csProduct.workingDays.includes(dateStr);
+                            
+                            combinedDailyData.push([
+                                csProduct.productId,
+                                cs.name,
+                                dateStr,
+                                isWorkingDay ? 'M DAY' : 'NON M DAY',
+                                'Control Station'
+                            ]);
+                            
+                            currentDate.setDate(currentDate.getDate() + 1);
+                        }
+                    });
+                });
+            }
+            
+            // Sort combined data by Product ID, then Date, then Category
+            combinedDailyData.sort((a, b) => {
+                if (a[0] === 'Product') return -1; // Keep header at top
+                if (b[0] === 'Product') return 1;
+                
+                const productCompare = a[0] - b[0];
+                if (productCompare !== 0) return productCompare;
+                
+                const dateCompare = new Date(a[2]) - new Date(b[2]);
+                if (dateCompare !== 0) return dateCompare;
+                
+                // Positions before Control Stations
+                if (a[4] === 'Position' && b[4] === 'Control Station') return -1;
+                if (a[4] === 'Control Station' && b[4] === 'Position') return 1;
+                
+                return 0;
+            });
+            
+            const ws3 = XLSX.utils.aoa_to_sheet(combinedDailyData);
+            XLSX.utils.book_append_sheet(wb, ws3, 'Combined Daily Breakdown');
+            
+            // Write file
+            XLSX.writeFile(wb, `Daily_Schedule_Breakdown_${formatDate(new Date())}.xlsx`);
+            showToast('Daily breakdown exported to Excel successfully');
+        }
+        
+        // Update control stations when schedule changes
+        function recalculateControlStations() {
+            controlStations.forEach(cs => {
+                cs.products = [];
+                schedule.forEach(product => {
+                    const csProduct = calculateControlStationForProduct(product, cs);
+                    if (csProduct) {
+                        cs.products.push(csProduct);
+                    }
+                });
+            });
+            
+            if (controlStations.length > 0) {
+                renderControlStationGantt();
+                updateControlStationStats();
+            }
+        }
+        
+        // Save Control Station Template
+        function saveControlStationTemplate() {
+            if (controlStations.length === 0) {
+                alert('No control stations to save');
+                return;
+            }
+            document.getElementById('saveCSTemplateModal').style.display = 'block';
+        }
+        
+        function confirmSaveCSTemplate() {
+            const name = document.getElementById('csTemplateName').value.trim();
+            if (!name) {
+                alert('Please enter a template name');
+                return;
+            }
+            
+            // Create template object with just the control station definitions
+            const template = {
+                name: name,
+                date: new Date().toISOString(),
+                controlStations: controlStations.map(cs => {
+                    // Save only the configuration, not the calculated products
+                    const csConfig = {
+                        name: cs.name,
+                        mode: cs.mode,
+                        color: cs.color
+                    };
+                    
+                    if (cs.mode === 'duration') {
+                        csConfig.basePosition = cs.basePosition;
+                        csConfig.offset = cs.offset;
+                        csConfig.duration = cs.duration;
+                    } else {
+                        csConfig.startPosition = cs.startPosition;
+                        csConfig.startOffset = cs.startOffset;
+                        csConfig.endPosition = cs.endPosition;
+                        csConfig.endOffset = cs.endOffset;
+                    }
+                    
+                    return csConfig;
+                })
+            };
+            
+            // Save to localStorage
+            let savedTemplates = JSON.parse(localStorage.getItem('csTemplates') || '{}');
+            savedTemplates[name] = template;
+            localStorage.setItem('csTemplates', JSON.stringify(savedTemplates));
+            
+            closeSaveCSTemplateModal();
+            showToast(`Control Station Template "${name}" saved successfully`);
+        }
+        
+        function closeSaveCSTemplateModal() {
+            document.getElementById('saveCSTemplateModal').style.display = 'none';
+            document.getElementById('csTemplateName').value = '';
+        }
+        
+        // Load Control Station Template
+        function loadControlStationTemplate() {
+            const savedTemplates = JSON.parse(localStorage.getItem('csTemplates') || '{}');
+            const select = document.getElementById('csTemplateSelect');
+            select.innerHTML = '';
+            
+            Object.keys(savedTemplates).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                const date = new Date(savedTemplates[name].date);
+                option.textContent = `${name} (${savedTemplates[name].controlStations.length} stations - ${date.toLocaleDateString()})`;
+                select.appendChild(option);
+            });
+            
+            if (select.options.length === 0) {
+                alert('No saved control station templates found');
+                return;
+            }
+            
+            document.getElementById('loadCSTemplateModal').style.display = 'block';
+        }
+        
+        function confirmLoadCSTemplate() {
+            const select = document.getElementById('csTemplateSelect');
+            const name = select.value;
+            
+            const savedTemplates = JSON.parse(localStorage.getItem('csTemplates') || '{}');
+            const template = savedTemplates[name];
+            
+            if (!template) return;
+            
+            // Clear existing control stations
+            controlStations = [];
+            controlStationIdCounter = 1;
+            
+            // Load control stations from template
+            template.controlStations.forEach(csConfig => {
+                const cs = {
+                    id: controlStationIdCounter++,
+                    name: csConfig.name,
+                    mode: csConfig.mode,
+                    color: csConfig.color,
+                    products: []
+                };
+                
+                if (csConfig.mode === 'duration') {
+                    cs.basePosition = csConfig.basePosition;
+                    cs.offset = csConfig.offset;
+                    cs.duration = csConfig.duration;
+                } else {
+                    cs.startPosition = csConfig.startPosition;
+                    cs.startOffset = csConfig.startOffset;
+                    cs.endPosition = csConfig.endPosition;
+                    cs.endOffset = csConfig.endOffset;
+                }
+                
+                // Calculate for current schedule if it exists
+                if (schedule.length > 0) {
+                    schedule.forEach(product => {
+                        const csProduct = calculateControlStationForProduct(product, cs);
+                        if (csProduct) {
+                            cs.products.push(csProduct);
+                        }
+                    });
+                }
+                
+                controlStations.push(cs);
+            });
+            
+            // Update UI
+            updateControlStationList();
+            renderControlStationGantt();
+            updateControlStationStats();
+            
+            closeLoadCSTemplateModal();
+            showToast(`Control Station Template "${name}" loaded successfully`);
+        }
+        
+        function closeLoadCSTemplateModal() {
+            document.getElementById('loadCSTemplateModal').style.display = 'none';
+        }
+        
+        // Export Control Station Template as JSON file
+        function exportCSTemplateToFile() {
+            if (controlStations.length === 0) {
+                alert('No control stations to export');
+                return;
+            }
+            
+            const template = {
+                name: 'Control Station Template',
+                date: new Date().toISOString(),
+                version: '1.0',
+                controlStations: controlStations.map(cs => {
+                    const csConfig = {
+                        name: cs.name,
+                        mode: cs.mode,
+                        color: cs.color
+                    };
+                    
+                    if (cs.mode === 'duration') {
+                        csConfig.basePosition = cs.basePosition;
+                        csConfig.offset = cs.offset;
+                        csConfig.duration = cs.duration;
+                    } else {
+                        csConfig.startPosition = cs.startPosition;
+                        csConfig.startOffset = cs.startOffset;
+                        csConfig.endPosition = cs.endPosition;
+                        csConfig.endOffset = cs.endOffset;
+                    }
+                    
+                    return csConfig;
+                })
+            };
+            
+            // Create and download JSON file
+            const dataStr = JSON.stringify(template, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            const exportFileDefaultName = `CS_Template_${formatDate(new Date())}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            showToast('Control Station Template exported as JSON file');
+        }
+        
+        // Import Control Station Template from JSON file
+        function importCSTemplateFromFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = readerEvent => {
+                    try {
+                        const template = JSON.parse(readerEvent.target.result);
+                        
+                        // Validate template structure
+                        if (!template.controlStations || !Array.isArray(template.controlStations)) {
+                            alert('Invalid template file format');
+                            return;
+                        }
+                        
+                        // Clear existing control stations
+                        controlStations = [];
+                        controlStationIdCounter = 1;
+                        
+                        // Load control stations from template
+                        template.controlStations.forEach(csConfig => {
+                            const cs = {
+                                id: controlStationIdCounter++,
+                                name: csConfig.name,
+                                mode: csConfig.mode,
+                                color: csConfig.color,
+                                products: []
+                            };
+                            
+                            if (csConfig.mode === 'duration') {
+                                cs.basePosition = csConfig.basePosition;
+                                cs.offset = csConfig.offset;
+                                cs.duration = csConfig.duration;
+                            } else {
+                                cs.startPosition = csConfig.startPosition;
+                                cs.startOffset = csConfig.startOffset;
+                                cs.endPosition = csConfig.endPosition;
+                                cs.endOffset = csConfig.endOffset;
+                            }
+                            
+                            // Calculate for current schedule if it exists
+                            if (schedule.length > 0) {
+                                schedule.forEach(product => {
+                                    const csProduct = calculateControlStationForProduct(product, cs);
+                                    if (csProduct) {
+                                        cs.products.push(csProduct);
+                                    }
+                                });
+                            }
+                            
+                            controlStations.push(cs);
+                        });
+                        
+                        // Update UI
+                        updateControlStationList();
+                        renderControlStationGantt();
+                        updateControlStationStats();
+                        
+                        showToast('Control Station Template imported successfully');
+                        
+                    } catch (error) {
+                        alert('Error reading template file: ' + error.message);
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+    
+</script>
+<!-- Control Station Dashboard Section -->
+    <div class="control-station-section" style="margin-top: 40px;">
+        <div class="header" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+            <h2>Control Station Dashboard</h2>
+            <p>Define control station templates based on M-day offsets - automatically applied to all products</p>
+        </div>
+        
+        <div class="controls" style="background: white; padding: 20px; margin: 20px; border-radius: 8px;">
+            <h3 style="margin-bottom: 15px; color: #333;">Add Control Station</h3>
+            
+            <!-- M-Day Reference Display -->
+            <div style="background: #f0f0f0; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
+                <h4 style="margin: 0 0 10px 0; color: #666; font-size: 14px;">M-Day Reference (Position 0 = M1)</h4>
+                <div id="mDayReference" style="font-family: monospace; font-size: 12px; color: #333;">
+                    <!-- Will be populated dynamically -->
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Station Name:</label>
+                <input type="text" id="csName" placeholder="e.g., 700-C0/E0" style="width: 200px;">
+            </div>
+            <div class="control-group">
+                <label>Configuration Mode:</label>
+                <select id="csMode" onchange="toggleControlStationMode()">
+                    <option value="duration">Duration-based</option>
+                    <option value="position">Position-to-Position</option>
+                </select>
+            </div>
+            
+            <!-- Duration-based configuration -->
+            <div id="csDurationConfig">
+                <div class="control-group">
+                    <label>Start - Based on Position:</label>
+                    <select id="csBasePosition">
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Start - M-Day Offset:</label>
+                    <input type="number" id="csOffset" value="0" min="-20" max="20" title="Negative = earlier, Positive = later">
+                </div>
+                <div class="control-group">
+                    <label>Duration (M-days):</label>
+                    <input type="number" id="csDuration" value="5" min="1" max="30">
+                </div>
+            </div>
+            
+            <!-- Position-to-Position configuration -->
+            <div id="csPositionConfig" style="display: none;">
+                <div class="control-group">
+                    <label>Start - Based on Position:</label>
+                    <select id="csStartPosition">
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Start - M-Day Offset:</label>
+                    <input type="number" id="csStartOffset" value="-2" min="-20" max="20" title="Relative to start position">
+                </div>
+                <div class="control-group">
+                    <label>End - Based on Position:</label>
+                    <select id="csEndPosition">
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>End - M-Day Offset:</label>
+                    <input type="number" id="csEndOffset" value="1" min="-20" max="20" title="Relative to end position">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Color:</label>
+                <input type="color" id="csColor" value="#4ade80">
+            </div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                <button onclick="addControlStation()" style="background: #10b981;">➕ Add Control Station</button>
+                <button onclick="clearControlStations()" style="background: #ef4444;">🗑️ Clear All</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <button onclick="saveControlStationTemplate()" style="background: #3b82f6;">💾 Save Template</button>
+                <button onclick="loadControlStationTemplate()" style="background: #3b82f6;">📂 Load Template</button>
+                <button onclick="exportCSTemplateToFile()" style="background: #8b5cf6;">⬇️ Export to File</button>
+                <button onclick="importCSTemplateFromFile()" style="background: #8b5cf6;">⬆️ Import from File</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <button onclick="exportControlStations()" style="background: #f59e0b;">📊 Export CS to Excel</button>
+                <button onclick="exportCombinedSchedule()" style="background: #059669;">📈 Export Combined Schedule</button>
+                <button onclick="exportDetailedDailySchedule()" style="background: #6366f1;">📋 Export Daily Breakdown</button>
+            </div>
+        </div>
+        
+        <div class="stats" id="csStats" style="background: white; padding: 15px; margin: 20px; border-radius: 8px;">
+            <div class="stat-item">
+                <span class="stat-label">Total Control Stations:</span>
+                <span class="stat-value" id="totalControlStations">0</span>
+            </div>
+        </div>
+        
+        <div class="control-station-list" style="background: white; padding: 15px; margin: 20px; border-radius: 8px;">
+            <h3 style="margin-bottom: 15px; color: #333;">Configured Control Stations</h3>
+            <div id="csListContainer" style="max-height: 200px; overflow-y: auto;">
+                <!-- Control stations will be listed here -->
+            </div>
+        </div>
+        
+        <div class="gantt-container" id="csGanttContainer" style="margin: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); overflow-x: auto; overflow-y: auto; max-height: 50vh;">
+            <div class="gantt-header">
+                <div class="gantt-header-product" style="width: 200px; min-width: 200px;">Control Station</div>
+                <div class="gantt-header-timeline" id="csGanttHeaderTimeline"></div>
+            </div>
+            <div class="gantt-body" id="csGanttBody"></div>
+        </div>
+    </div>
+</body>
+</html>
